@@ -846,52 +846,166 @@ const handlers = {
   async getDashboardReports(params = {}) {
     const { startDate, endDate, teamLeaderId } = params
 
-    let query = supabase
+    // Fetch all activities in range (with is_done=1) and joined data
+    let actQuery = supabase
       .from('daily_activities')
       .select(`
-        id, duration, category_id, on_duty_user_id, activity_date, team_leader_id,
+        id, duration, category_id, source_id, on_duty_user_id, activity_date, team_leader_id, is_done,
         activity_categories(name),
-        users!daily_activities_on_duty_user_id_fkey(name, role)
+        activity_sources(name),
+        users!daily_activities_on_duty_user_id_fkey(id, name, role)
       `)
+      .eq('is_done', 1)
 
-    if (teamLeaderId) query = query.eq('team_leader_id', teamLeaderId)
-    if (startDate) query = query.gte('activity_date', startDate)
-    if (endDate) query = query.lte('activity_date', endDate)
+    if (teamLeaderId) actQuery = actQuery.eq('team_leader_id', teamLeaderId)
+    if (startDate) actQuery = actQuery.gte('activity_date', startDate)
+    if (endDate) actQuery = actQuery.lte('activity_date', endDate)
 
-    const { data: activities } = await query
+    const { data: rawActs } = await actQuery
+    const acts = rawActs || []
 
-    const acts = activities || []
-    const totalActivities = acts.length
-    const totalMinutes = acts.reduce((sum, a) => sum + (a.duration || 0), 0)
+    // Get all team leaders (and their caretakers) for teamStats
+    let tlQuery = supabase
+      .from('users')
+      .select('id, name, area, role, team_leader_id')
+      .order('name')
 
-    // By category
-    const byCategory = {}
-    acts.forEach(a => {
-      const cat = a.activity_categories?.name || 'Other'
-      if (!byCategory[cat]) byCategory[cat] = { name: cat, count: 0, minutes: 0 }
-      byCategory[cat].count++
-      byCategory[cat].minutes += a.duration || 0
+    if (teamLeaderId) tlQuery = tlQuery.or(`id.eq.${teamLeaderId},team_leader_id.eq.${teamLeaderId}`)
+
+    const { data: allUsers } = await tlQuery
+    const users = allUsers || []
+    const teamLeaders = users.filter(u => u.role === 'team_leader')
+
+    // ── Totals ──
+    const totals = {
+      total_activities: acts.length,
+      total_minutes: acts.reduce((s, a) => s + (a.duration || 0), 0),
+      total_days: new Set(acts.map(a => a.activity_date)).size,
+      active_users: new Set(acts.map(a => a.on_duty_user_id)).size
+    }
+
+    // ── teamStats (TL+CT pair stats) ──
+    const teamStats = teamLeaders.map(tl => {
+      const ct = users.find(u => u.role === 'caretaker' && u.team_leader_id === tl.id)
+      const tlActs = acts.filter(a => a.on_duty_user_id === tl.id)
+      const ctActs = ct ? acts.filter(a => a.on_duty_user_id === ct.id) : []
+      return {
+        tl_id: tl.id,
+        tl_name: tl.name,
+        area: tl.area,
+        ct_id: ct?.id || null,
+        ct_name: ct?.name || null,
+        tl_minutes: tlActs.reduce((s, a) => s + (a.duration || 0), 0),
+        tl_activities: tlActs.length,
+        ct_minutes: ctActs.reduce((s, a) => s + (a.duration || 0), 0),
+        ct_activities: ctActs.length,
+        tl_days: new Set(tlActs.map(a => a.activity_date)).size,
+        ct_days: new Set(ctActs.map(a => a.activity_date)).size
+      }
     })
 
-    // By user
-    const byUser = {}
+    // ── byCategory ──
+    const catMap = {}
     acts.forEach(a => {
-      const userName = a.users?.name || 'Unknown'
-      if (!byUser[userName]) byUser[userName] = { name: userName, role: a.users?.role, count: 0, minutes: 0 }
-      byUser[userName].count++
-      byUser[userName].minutes += a.duration || 0
+      const name = a.activity_categories?.name || 'Other'
+      if (!catMap[name]) catMap[name] = { category: name, count: 0, total_minutes: 0 }
+      catMap[name].count++
+      catMap[name].total_minutes += a.duration || 0
     })
+    const byCategory = Object.values(catMap).sort((a, b) => b.count - a.count)
+
+    // ── bySource ──
+    const srcMap = {}
+    acts.forEach(a => {
+      const name = a.activity_sources?.name || 'Tidak ada'
+      if (!srcMap[name]) srcMap[name] = { source: name, count: 0 }
+      srcMap[name].count++
+    })
+    const bySource = Object.values(srcMap).sort((a, b) => b.count - a.count)
+
+    // ── byRole ──
+    const roleMap = {}
+    acts.forEach(a => {
+      const role = a.users?.role || 'unknown'
+      if (!roleMap[role]) roleMap[role] = { role, count: 0, total_minutes: 0 }
+      roleMap[role].count++
+      roleMap[role].total_minutes += a.duration || 0
+    })
+    const byRole = Object.values(roleMap)
+
+    // ── dailyTrend ──
+    const dailyMap = {}
+    acts.forEach(a => {
+      const date = a.activity_date
+      if (!dailyMap[date]) dailyMap[date] = { date, total_minutes: 0, count: 0 }
+      dailyMap[date].total_minutes += a.duration || 0
+      dailyMap[date].count++
+    })
+    const dailyTrend = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date))
+
+    // ── handoverCount (pending tasks in range) ──
+    let handoverQuery = supabase
+      .from('handover_tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_processed', 0)
+
+    if (teamLeaderId) handoverQuery = handoverQuery.eq('team_leader_id', teamLeaderId)
+    if (startDate) handoverQuery = handoverQuery.gte('assigned_date', startDate)
+    if (endDate) handoverQuery = handoverQuery.lte('assigned_date', endDate)
+
+    const { count: handoverCount } = await handoverQuery
 
     return {
-      totalActivities,
-      totalMinutes,
-      byCategory: Object.values(byCategory),
-      byUser: Object.values(byUser)
+      teamStats,
+      byCategory,
+      bySource,
+      byRole,
+      dailyTrend,
+      totals,
+      handoverCount: { count: handoverCount || 0 }
     }
   },
 
   async getSummaryReports(params = {}) {
-    return this.getDashboardReports(params)
+    const { startDate, endDate, teamLeaderId } = params
+
+    // Get all team_leader + caretaker users (filtered by team if needed)
+    let userQuery = supabase
+      .from('users')
+      .select('id, name, role, team_leader_id')
+      .in('role', ['team_leader', 'caretaker'])
+
+    if (teamLeaderId) {
+      userQuery = userQuery.or(`id.eq.${teamLeaderId},team_leader_id.eq.${teamLeaderId}`)
+    }
+
+    const { data: users } = await userQuery.order('role', { ascending: false }).order('name')
+
+    // Get all activities in date range with is_done=1
+    let actQuery = supabase
+      .from('daily_activities')
+      .select('id, on_duty_user_id, duration, activity_date, is_done')
+      .eq('is_done', 1)
+
+    if (startDate) actQuery = actQuery.gte('activity_date', startDate)
+    if (endDate) actQuery = actQuery.lte('activity_date', endDate)
+
+    const { data: activities } = await actQuery
+
+    // Aggregate per user
+    return (users || []).map(u => {
+      const userActs = (activities || []).filter(a => a.on_duty_user_id === u.id)
+      const uniqueDates = new Set(userActs.map(a => a.activity_date))
+      return {
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        team_leader_id: u.team_leader_id,
+        total_activities: userActs.length,
+        total_minutes: userActs.reduce((s, a) => s + (a.duration || 0), 0),
+        days_worked: uniqueDates.size
+      }
+    })
   },
 
   async getDetailedReports(params = {}) {
