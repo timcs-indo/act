@@ -169,27 +169,59 @@ const handlers = {
 
     if (!userId) throw new Error('User tidak terautentikasi. Silakan login ulang.')
 
-    // Get current password from DB
+    // Get current user data from DB
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('password_hash')
+      .select('id, email, password_hash')
       .eq('id', userId)
       .single()
 
-    if (userError || !user) throw new Error('User tidak ditemukan')
+    if (userError || !user) {
+      throw new Error('User tidak ditemukan di database. ID: ' + userId)
+    }
+
+    console.log('[ChangePassword] Found user:', { id: user.id, email: user.email })
 
     // Verify old password
     if (user.password_hash !== old_password) {
       throw new Error('Password lama salah')
     }
 
-    // Update password
-    const { error: updateError } = await supabase
+    // Update password - use .select() to get updated row back to verify
+    const { data: updated, error: updateError } = await supabase
       .from('users')
       .update({ password_hash: new_password })
       .eq('id', userId)
+      .select('id, email, password_hash')
 
-    if (updateError) throw new Error('Gagal update password: ' + updateError.message)
+    if (updateError) {
+      console.error('[ChangePassword] Update error:', updateError)
+      throw new Error('Gagal update password: ' + updateError.message + '. Cek RLS policy di Supabase.')
+    }
+
+    if (!updated || updated.length === 0) {
+      throw new Error('Update tidak berhasil. Kemungkinan RLS policy memblokir UPDATE. Jalankan SQL: CREATE POLICY "Allow update users" ON users FOR UPDATE USING (true) WITH CHECK (true);')
+    }
+
+    console.log('[ChangePassword] Updated user:', updated[0])
+
+    // Verify the password was actually changed
+    if (updated[0].password_hash !== new_password) {
+      throw new Error('Password tidak ter-update. Database masih menyimpan password lama.')
+    }
+
+    // Double check by re-reading from DB
+    const { data: verifyUser } = await supabase
+      .from('users')
+      .select('password_hash')
+      .eq('id', userId)
+      .single()
+
+    if (verifyUser && verifyUser.password_hash !== new_password) {
+      throw new Error('Verifikasi gagal: password di database masih yang lama. Cek RLS policy.')
+    }
+
+    console.log('[ChangePassword] Verified - password is now:', new_password)
 
     return { success: true }
   },
