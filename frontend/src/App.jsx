@@ -7,7 +7,7 @@ import Reports from './pages/Reports'
 import UserManagement from './pages/UserManagement'
 import Login from './pages/Login'
 import { supabase } from './utils/supabase'
-import { isDevelopment } from './utils/api'
+import api, { isDevelopment } from './utils/api'
 
 const ROLE_LABEL = { supervisor: 'Supervisor', team_leader: 'Team Leader', caretaker: 'Caretaker' }
 const ROLE_COLOR = { supervisor: '#0D7A71', team_leader: '#17A697', caretaker: '#FFC107' }
