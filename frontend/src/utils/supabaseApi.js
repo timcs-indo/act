@@ -143,55 +143,52 @@ const handlers = {
     if (!old_password || !new_password) throw new Error('Password lama dan baru wajib diisi')
     if (new_password.length < 6) throw new Error('Password baru minimal 6 karakter')
 
-    // Get current user ID - try session first, fallback to localStorage
+    // Get current user EMAIL from localStorage (more reliable than ID after DB resets)
+    let userEmail = null
     let userId = null
 
-    const token = localStorage.getItem('auth_token')
-    if (token) {
-      const { data: session } = await supabase
-        .from('sessions')
-        .select('user_id')
-        .eq('token', token)
-        .maybeSingle()
-      if (session) userId = session.user_id
+    const cachedUser = localStorage.getItem('auth_user')
+    if (cachedUser) {
+      try {
+        const u = JSON.parse(cachedUser)
+        userEmail = u?.email
+        userId = u?.id
+      } catch {}
     }
 
-    // Fallback: get user from localStorage cached auth_user
-    if (!userId) {
-      const cachedUser = localStorage.getItem('auth_user')
-      if (cachedUser) {
-        try {
-          const u = JSON.parse(cachedUser)
-          if (u?.id) userId = u.id
-        } catch {}
-      }
-    }
+    if (!userEmail) throw new Error('User email tidak ditemukan. Silakan login ulang.')
 
-    if (!userId) throw new Error('User tidak terautentikasi. Silakan login ulang.')
+    const normalizedEmail = userEmail.toLowerCase().trim()
+    console.log('[ChangePassword] Looking up user by email:', normalizedEmail)
 
-    // Get current user data from DB
+    // Get current user data from DB by EMAIL (most reliable)
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('id, email, password_hash')
-      .eq('id', userId)
+      .eq('email', normalizedEmail)
       .single()
 
     if (userError || !user) {
-      throw new Error('User tidak ditemukan di database. ID: ' + userId)
+      console.error('[ChangePassword] User lookup error:', userError)
+      throw new Error(`User dengan email ${normalizedEmail} tidak ditemukan di database`)
     }
 
-    console.log('[ChangePassword] Found user:', { id: user.id, email: user.email })
+    console.log('[ChangePassword] Found user:', {
+      id: user.id,
+      email: user.email,
+      currentPasswordInDB: user.password_hash
+    })
 
     // Verify old password
     if (user.password_hash !== old_password) {
-      throw new Error('Password lama salah')
+      throw new Error(`Password lama salah. (DB has: "${user.password_hash}", you entered: "${old_password}")`)
     }
 
-    // Update password - use .select() to get updated row back to verify
+    // Update password by EMAIL (so we update the same user we just verified)
     const { data: updated, error: updateError } = await supabase
       .from('users')
       .update({ password_hash: new_password })
-      .eq('id', userId)
+      .eq('email', normalizedEmail)
       .select('id, email, password_hash')
 
     if (updateError) {
@@ -200,28 +197,20 @@ const handlers = {
     }
 
     if (!updated || updated.length === 0) {
-      throw new Error('Update tidak berhasil. Kemungkinan RLS policy memblokir UPDATE. Jalankan SQL: CREATE POLICY "Allow update users" ON users FOR UPDATE USING (true) WITH CHECK (true);')
+      throw new Error('Update tidak berhasil - 0 rows affected. RLS policy memblokir UPDATE. Jalankan SUPABASE_FIX_RLS.sql di Supabase.')
     }
 
-    console.log('[ChangePassword] Updated user:', updated[0])
+    console.log('[ChangePassword] Updated:', updated[0])
 
-    // Verify the password was actually changed
-    if (updated[0].password_hash !== new_password) {
-      throw new Error('Password tidak ter-update. Database masih menyimpan password lama.')
+    // Update localStorage with correct user ID (in case it was wrong)
+    if (cachedUser && updated[0].id !== userId) {
+      try {
+        const u = JSON.parse(cachedUser)
+        u.id = updated[0].id
+        localStorage.setItem('auth_user', JSON.stringify(u))
+        console.log('[ChangePassword] Fixed localStorage user.id to:', updated[0].id)
+      } catch {}
     }
-
-    // Double check by re-reading from DB
-    const { data: verifyUser } = await supabase
-      .from('users')
-      .select('password_hash')
-      .eq('id', userId)
-      .single()
-
-    if (verifyUser && verifyUser.password_hash !== new_password) {
-      throw new Error('Verifikasi gagal: password di database masih yang lama. Cek RLS policy.')
-    }
-
-    console.log('[ChangePassword] Verified - password is now:', new_password)
 
     return { success: true }
   },
