@@ -286,6 +286,12 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
   }
 
   const handleCellClick = (e, user) => {
+    // Only allow creating activity in your own row
+    // Supervisors can still only create for themselves (per business rule)
+    if (currentUser && user.id !== currentUser.id) {
+      toast.info(`📖 Hanya bisa lihat aktivitas ${user.name}. Untuk menambah aktivitas, klik di baris Anda sendiri.`)
+      return
+    }
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const totalMinutesFromStart = Math.floor((x / totalWidth) * 1440)
@@ -601,7 +607,7 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
         </div>
 
         <div style={{ fontSize: '11px', color: 'var(--text-light)', padding: '6px 16px', background: '#f8fafc', borderBottom: '1px solid var(--border)' }}>
-          💡 Klik area kosong di kalender untuk menambah aktivitas pada jam tersebut (user & jam auto-fill)
+          💡 Klik area kosong di baris <strong style={{ color: '#16a34a' }}>👤 Anda</strong> untuk menambah aktivitas. Aktivitas user lain hanya bisa dilihat (read-only).
         </div>
 
         <div style={{ overflowX: 'auto', overflowY: 'hidden', maxHeight: '500px', position: 'relative' }}>
@@ -663,16 +669,20 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
               return (
               <div key={user.id} style={{
                 display: 'flex', borderBottom: '1px solid var(--border)',
-                minHeight: effectiveRowHeight, alignItems: 'stretch'
+                minHeight: effectiveRowHeight, alignItems: 'stretch',
+                background: currentUser && user.id === currentUser.id ? '#f0fdf4' : 'transparent'
               }}>
                 <div style={{
                   width: USER_COL_WIDTH, flexShrink: 0, padding: '8px 14px',
                   borderRight: '2px solid var(--border)',
                   display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                  background: '#fafafa',
+                  background: currentUser && user.id === currentUser.id ? '#dcfce7' : '#fafafa',
                   position: 'sticky', left: 0, zIndex: 2
                 }}>
-                  <div style={{ fontWeight: 600, fontSize: '13px', lineHeight: 1.2 }}>{user.name}</div>
+                  <div style={{ fontWeight: 600, fontSize: '13px', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {currentUser && user.id === currentUser.id && <span title="Anda">👤</span>}
+                    {user.name}
+                  </div>
                   {totalMin > 0 && (
                     <div style={{ fontSize: '11px', color: '#17A697', fontWeight: 600, marginTop: '2px' }}>
                       {totalMin}m • {userActs.length}
@@ -682,8 +692,11 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
 
                 <div
                   onClick={(e) => handleCellClick(e, user)}
-                  style={{ position: 'relative', width: totalWidth, height: effectiveRowHeight, cursor: 'crosshair' }}
-                  title="Klik untuk tambah aktivitas pada jam ini"
+                  style={{
+                    position: 'relative', width: totalWidth, height: effectiveRowHeight,
+                    cursor: currentUser && user.id === currentUser.id ? 'crosshair' : 'default'
+                  }}
+                  title={currentUser && user.id === currentUser.id ? 'Klik untuk tambah aktivitas pada jam ini' : `Aktivitas ${user.name} (mode lihat saja)`}
                 >
                   {Array.from({ length: 24 }, (_, h) => (
                     <div key={h} style={{
@@ -1261,16 +1274,29 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
               {selectedActivity.notes && <DetailRow label="Catatan" value={selectedActivity.notes} />}
             </div>
 
-            {/* Action buttons */}
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-              <button className="btn btn-danger btn-sm"
-                onClick={() => { const a = selectedActivity; setSelectedActivity(null); handleDeleteActivity(a.id) }}>
-                🗑 Hapus
-              </button>
-              <button className="btn btn-primary btn-sm"
-                onClick={() => openModalEdit(selectedActivity)}>
-                ✏️ Edit
-              </button>
+            {/* Action buttons - only shown for own activities */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+              {currentUser && selectedActivity.on_duty_user_id === currentUser.id ? (
+                <>
+                  <button className="btn btn-danger btn-sm"
+                    onClick={() => { const a = selectedActivity; setSelectedActivity(null); handleDeleteActivity(a.id) }}>
+                    🗑 Hapus
+                  </button>
+                  <button className="btn btn-primary btn-sm"
+                    onClick={() => openModalEdit(selectedActivity)}>
+                    ✏️ Edit
+                  </button>
+                </>
+              ) : (
+                <div style={{
+                  fontSize: '12px', color: 'var(--text-light)',
+                  background: '#f0f9ff', padding: '8px 14px',
+                  borderRadius: '6px', border: '1px solid #bae6fd',
+                  display: 'flex', alignItems: 'center', gap: '6px'
+                }}>
+                  👁️ Mode lihat saja — aktivitas milik <strong>{selectedActivity.on_duty_name}</strong>
+                </div>
+              )}
             </div>
           </div>
         </div>
