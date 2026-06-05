@@ -35,6 +35,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
   const [createForm, setCreateForm] = useState({
     activity_name: '',
     category_id: '',
+    activity_date: new Date().toISOString().split('T')[0],
     duration: '30',
     start_time: '09:00',
     end_time: '09:30',
@@ -79,6 +80,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
     setCreateForm({
       activity_name: '',
       category_id: '',
+      activity_date: selectedDate || new Date().toISOString().split('T')[0],
       duration: '30',
       start_time: currentTime,
       end_time: endTime,
@@ -302,6 +304,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
     setCreateForm({
       activity_name: act.activity_name,
       category_id: act.category_id.toString(),
+      activity_date: act.activity_date || new Date().toISOString().split('T')[0],
       duration: act.duration.toString(),
       start_time: act.start_time || getCurrentTime(),
       end_time: act.end_time || '',
@@ -409,6 +412,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
     setCreateForm({
       activity_name: handoverTask.task_name,
       category_id: handoverTask.category_id?.toString() || '',
+      activity_date: selectedDate || new Date().toISOString().split('T')[0],
       duration: (handoverTask.duration || 30).toString(),
       start_time: currentTime,
       end_time: endTime,
@@ -516,7 +520,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
           const payload = {
             team_leader_id: teamLeaderId,
             on_duty_user_id: currentUser?.id,
-            activity_date: selectedDate,
+            activity_date: createForm.activity_date || selectedDate,
             category_id: parseInt(createForm.category_id),
             activity_name: createForm.activity_name,
             duration: duration,
@@ -549,6 +553,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
       setCreateForm({
         activity_name: '',
         category_id: '',
+        activity_date: new Date().toISOString().split('T')[0],
         duration: '30',
         start_time: currentTime,
         end_time: endTime,
@@ -1146,26 +1151,24 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
                 </select>
               </div>
 
-              {/* Duration */}
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '14px' }}>
-                  Durasi (menit) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={createForm.duration}
-                  onChange={(e) => {
-                    const newDuration = e.target.value
-                    const newEndTime = calculateEndTime(createForm.start_time, newDuration)
-                    setCreateForm({ ...createForm, duration: newDuration, end_time: newEndTime })
-                  }}
-                  style={{
-                    width: '100%', padding: '10px', border: '1px solid var(--border)',
-                    borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box'
-                  }}
-                />
-              </div>
+              {/* Date - Hidden in handover mode */}
+              {!isHandoverMode && (
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '14px' }}>
+                    Tanggal Aktivitas *
+                  </label>
+                  <input
+                    type="date"
+                    value={createForm.activity_date}
+                    onChange={(e) => setCreateForm({ ...createForm, activity_date: e.target.value })}
+                    required
+                    style={{
+                      width: '100%', padding: '10px', border: '1px solid var(--border)',
+                      borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Start Time - Hidden in handover mode */}
               {!isHandoverMode && (
@@ -1206,6 +1209,27 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
                   />
                 </div>
               )}
+
+              {/* Duration */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '14px' }}>
+                  Durasi (menit) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={createForm.duration}
+                  onChange={(e) => {
+                    const newDuration = e.target.value
+                    const newEndTime = calculateEndTime(createForm.start_time, newDuration)
+                    setCreateForm({ ...createForm, duration: newDuration, end_time: newEndTime })
+                  }}
+                  style={{
+                    width: '100%', padding: '10px', border: '1px solid var(--border)',
+                    borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box'
+                  }}
+                />
+              </div>
 
               {/* Source */}
               <div style={{ marginBottom: '15px' }}>
