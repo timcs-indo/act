@@ -78,17 +78,31 @@ const handlers = {
     if (!email || !password) throw new Error('Email dan password wajib diisi')
 
     const normalizedEmail = email.toLowerCase().trim()
+
+    console.log('[Login] Looking up user with email:', normalizedEmail)
+
     const { data: user, error } = await supabase
       .from('users')
       .select('id, name, role, team_leader_id, area, email, password_hash')
       .eq('email', normalizedEmail)
       .single()
 
-    if (error || !user) throw new Error('Email atau password salah')
+    if (error || !user) {
+      console.error('[Login] User not found. Error:', error)
+      throw new Error('Email atau password salah - email tidak terdaftar')
+    }
+
+    console.log('[Login] Found user:', {
+      id: user.id,
+      email: user.email,
+      passwordInDB: user.password_hash,
+      passwordEntered: password,
+      match: user.password_hash === password
+    })
 
     // Simple password check (plain text in DB for simplicity in production demo)
     if (user.password_hash !== password) {
-      throw new Error('Email atau password salah')
+      throw new Error(`Password salah. DB has: "${user.password_hash}" (length: ${user.password_hash?.length}), you entered: "${password}" (length: ${password.length})`)
     }
 
     const token = generateToken()
