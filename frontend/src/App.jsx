@@ -562,12 +562,12 @@ function GoogleCalendarButton() {
   const [busy, setBusy] = useState(false)
 
   const loadStatus = () => {
-    // Only load Google status in development mode
+    // In production mode, show button but mark as configured (will show "coming soon" on click)
     if (!isDevelopment()) {
-      setStatus({ configured: false, connected: false })
+      setStatus({ configured: true, connected: false })
       return
     }
-    
+
     api.get('/google/status')
       .then(res => setStatus(res.data))
       .catch(() => setStatus({ configured: false, connected: false }))
