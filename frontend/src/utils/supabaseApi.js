@@ -138,6 +138,47 @@ const handlers = {
     return { user }
   },
 
+  async changePassword(body) {
+    const token = localStorage.getItem('auth_token')
+    if (!token) throw new Error('Not authenticated')
+
+    const { old_password, new_password } = body
+    if (!old_password || !new_password) throw new Error('Password lama dan baru wajib diisi')
+    if (new_password.length < 6) throw new Error('Password baru minimal 6 karakter')
+
+    // Get current session and user
+    const { data: session, error: sessionError } = await supabase
+      .from('sessions')
+      .select('user_id')
+      .eq('token', token)
+      .single()
+
+    if (sessionError || !session) throw new Error('Session tidak ditemukan')
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('password_hash')
+      .eq('id', session.user_id)
+      .single()
+
+    if (userError || !user) throw new Error('User tidak ditemukan')
+
+    // Verify old password
+    if (user.password_hash !== old_password) {
+      throw new Error('Password lama salah')
+    }
+
+    // Update password
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password_hash: new_password })
+      .eq('id', session.user_id)
+
+    if (updateError) throw updateError
+
+    return { success: true }
+  },
+
   // ── USERS ──
   async getUsers() {
     const { data } = await supabase
@@ -737,6 +778,7 @@ class SupabaseAPI {
       // Auth
       if (endpoint === '/auth/login') return ok(await handlers.login(body))
       if (endpoint === '/auth/logout') return ok(await handlers.logout())
+      if (endpoint === '/auth/change-password') return ok(await handlers.changePassword(body))
 
       // Users
       if (endpoint === '/users') return ok(await handlers.createUser(body))

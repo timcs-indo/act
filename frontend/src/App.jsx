@@ -225,6 +225,7 @@ export default function App() {
 
 function Sidebar({ currentPage, setCurrentPage, currentUser, onLogout, isOpen, onClose }) {
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [showChangePassword, setShowChangePassword] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -343,6 +344,17 @@ function Sidebar({ currentPage, setCurrentPage, currentUser, onLogout, isOpen, o
 
         <GoogleCalendarButton />
         <button
+          onClick={() => setShowChangePassword(true)}
+          style={{
+            marginTop: '8px', width: '100%', padding: '7px',
+            background: 'white', border: '1px solid var(--primary)',
+            borderRadius: '6px', cursor: 'pointer', fontSize: '13px',
+            color: 'var(--primary)', fontWeight: 600
+          }}
+        >
+          🔐 Ganti Password
+        </button>
+        <button
           onClick={onLogout}
           style={{
             marginTop: '8px', width: '100%', padding: '7px',
@@ -353,6 +365,181 @@ function Sidebar({ currentPage, setCurrentPage, currentUser, onLogout, isOpen, o
         >
           🚪 Logout
         </button>
+      </div>
+
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
+    </div>
+  )
+}
+
+function ChangePasswordModal({ onClose }) {
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showOld, setShowOld] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setError('Semua field wajib diisi')
+      return
+    }
+    if (newPassword.length < 6) {
+      setError('Password baru minimal 6 karakter')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Konfirmasi password tidak cocok')
+      return
+    }
+    if (oldPassword === newPassword) {
+      setError('Password baru harus berbeda dengan password lama')
+      return
+    }
+
+    setLoading(true)
+    try {
+      await api.post('/auth/change-password', {
+        old_password: oldPassword,
+        new_password: newPassword
+      })
+      setSuccess(true)
+      setTimeout(() => onClose(), 2000)
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Gagal mengubah password')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 2000
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'white', borderRadius: '12px',
+        maxWidth: '420px', width: '90%',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+        overflow: 'hidden'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 24px',
+          background: 'linear-gradient(90deg, #17A697 0%, #0D7A71 100%)',
+          color: 'white',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+        }}>
+          <h3 style={{ fontSize: '18px', margin: 0 }}>🔐 Ganti Password</h3>
+          <button onClick={onClose} style={{
+            background: 'rgba(255,255,255,0.2)', border: 'none',
+            width: 30, height: 30, borderRadius: '50%', color: 'white',
+            fontSize: '18px', cursor: 'pointer'
+          }}>×</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '24px' }}>
+          {success ? (
+            <div style={{
+              padding: '20px', background: '#d1fae5',
+              color: '#065f46', borderRadius: '8px',
+              textAlign: 'center', fontWeight: 600
+            }}>
+              ✅ Password berhasil diubah!
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              {error && (
+                <div style={{
+                  padding: '10px 12px', marginBottom: '14px',
+                  background: '#fee2e2', color: '#991b1b',
+                  borderRadius: '6px', fontSize: '13px',
+                  border: '1px solid #fecaca'
+                }}>
+                  ⚠️ {error}
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Password Lama <span style={{ color: '#dc2626' }}>*</span></label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showOld ? 'text' : 'password'}
+                    value={oldPassword}
+                    onChange={e => setOldPassword(e.target.value)}
+                    placeholder="Masukkan password lama"
+                    autoFocus
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button type="button" onClick={() => setShowOld(!showOld)}
+                    style={{
+                      position: 'absolute', right: '8px', top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontSize: '16px'
+                    }}>
+                    {showOld ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Password Baru <span style={{ color: '#dc2626' }}>*</span></label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showNew ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Minimal 6 karakter"
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button type="button" onClick={() => setShowNew(!showNew)}
+                    style={{
+                      position: 'absolute', right: '8px', top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontSize: '16px'
+                    }}>
+                    {showNew ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Konfirmasi Password Baru <span style={{ color: '#dc2626' }}>*</span></label>
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Ulangi password baru"
+                />
+              </div>
+
+              <div style={{
+                display: 'flex', gap: '10px', justifyContent: 'flex-end',
+                marginTop: '20px', paddingTop: '16px',
+                borderTop: '1px solid var(--border)'
+              }}>
+                <button type="button" onClick={onClose} className="btn btn-outline" disabled={loading}>
+                  Batal
+                </button>
+                <button type="submit" className="btn btn-success" disabled={loading}>
+                  {loading ? '⏳ Menyimpan...' : '✓ Simpan Password Baru'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   )
