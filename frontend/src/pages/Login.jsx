@@ -50,7 +50,7 @@ export default function Login({ onLogin }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #4ECDC4 0%, #17A697 100%)',
+      background: '#ffffff',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '20px'
     }}>
