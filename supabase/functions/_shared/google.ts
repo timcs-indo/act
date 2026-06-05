@@ -121,6 +121,19 @@ export async function getValidAccessToken(user: {
   }
 }
 
+// Normalize time string to HH:MM:SS format
+function normalizeTime(timeStr: string): string {
+  if (!timeStr) return '00:00:00'
+  // Handle "HH:MM" or "HH:MM:SS" format
+  const parts = timeStr.split(':')
+  if (parts.length === 2) {
+    return `${parts[0]}:${parts[1]}:00`
+  } else if (parts.length === 3) {
+    return timeStr
+  }
+  return timeStr
+}
+
 // Build Google Calendar event from activity
 export function buildCalendarEvent(activity: any, includeMeet = false): any {
   const tz = Deno.env.get('GOOGLE_CALENDAR_TZ') || 'Asia/Jakarta'
@@ -139,13 +152,14 @@ export function buildCalendarEvent(activity: any, includeMeet = false): any {
   }
 
   if (activity.start_time) {
-    const end = activity.end_time || activity.start_time
+    const startTime = normalizeTime(activity.start_time)
+    const endTime = normalizeTime(activity.end_time || activity.start_time)
     event.start = {
-      dateTime: `${activity.activity_date}T${activity.start_time}:00`,
+      dateTime: `${activity.activity_date}T${startTime}`,
       timeZone: tz
     }
     event.end = {
-      dateTime: `${activity.activity_date}T${end}:00`,
+      dateTime: `${activity.activity_date}T${endTime}`,
       timeZone: tz
     }
   } else {
@@ -172,6 +186,9 @@ export async function createCalendarEvent(
   includeMeet = false
 ): Promise<string> {
   const url = `${GOOGLE_CALENDAR_API}/calendars/primary/events${includeMeet ? '?conferenceDataVersion=1' : ''}`
+  console.log('[createCalendarEvent] URL:', url)
+  console.log('[createCalendarEvent] Event payload:', JSON.stringify(event, null, 2))
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -183,6 +200,28 @@ export async function createCalendarEvent(
 
   if (!res.ok) {
     const err = await res.text()
+    console.error('[createCalendarEvent] Failed:', err)
+
+    // Try once more without Meet conference data if that was the issue
+    if (includeMeet && err.includes('conferenceData')) {
+      console.log('[createCalendarEvent] Retrying without Meet...')
+      delete event.conferenceData
+      const retryRes = await fetch(`${GOOGLE_CALENDAR_API}/calendars/primary/events`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(event)
+      })
+      if (retryRes.ok) {
+        const data = await retryRes.json()
+        return data.id
+      }
+      const retryErr = await retryRes.text()
+      throw new Error(`Create event failed (after retry): ${retryErr}`)
+    }
+
     throw new Error(`Create event failed: ${err}`)
   }
 
