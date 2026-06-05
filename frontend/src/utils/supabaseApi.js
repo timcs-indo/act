@@ -355,7 +355,7 @@ const handlers = {
       .select(`
         id, team_leader_id, on_duty_user_id, activity_date,
         category_id, activity_name, duration, start_time, end_time,
-        source_id, notes,
+        source_id, notes, is_done, google_event_id,
         users!daily_activities_on_duty_user_id_fkey(name, role),
         activity_categories(name),
         activity_sources(name)
@@ -383,7 +383,9 @@ const handlers = {
       end_time: a.end_time,
       source_id: a.source_id,
       source_name: a.activity_sources?.name,
-      notes: a.notes
+      notes: a.notes,
+      is_done: a.is_done || 0,
+      google_event_id: a.google_event_id
     }))
   },
 
@@ -394,7 +396,7 @@ const handlers = {
       .select(`
         id, team_leader_id, on_duty_user_id, activity_date,
         category_id, activity_name, duration, start_time, end_time,
-        source_id, notes,
+        source_id, notes, is_done,
         users!daily_activities_on_duty_user_id_fkey(name, role),
         team_leaders:users!daily_activities_team_leader_id_fkey(name, area),
         activity_categories(name),
@@ -421,7 +423,8 @@ const handlers = {
       end_time: a.end_time,
       source_id: a.source_id,
       source_name: a.activity_sources?.name,
-      notes: a.notes
+      notes: a.notes,
+      is_done: a.is_done || 0
     }))
   },
 
@@ -437,7 +440,8 @@ const handlers = {
       start_time: body.start_time || null,
       end_time: body.end_time || null,
       source_id: body.source_id || null,
-      notes: body.notes || null
+      notes: body.notes || null,
+      is_done: body.is_done ? 1 : 0
     }))
     const { data, error } = await supabase.from('daily_activities').insert(rows).select()
     if (error) throw error
@@ -497,6 +501,10 @@ const handlers = {
       source_id: body.source_id || null,
       notes: body.notes || null,
       updated_at: new Date().toISOString()
+    }
+    // Include is_done if provided (for mark done/undone)
+    if (body.is_done !== undefined) {
+      payload.is_done = body.is_done ? 1 : 0
     }
     const { error } = await supabase.from('daily_activities').update(payload).eq('id', id)
     if (error) throw error
