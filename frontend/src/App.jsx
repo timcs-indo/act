@@ -6,7 +6,7 @@ import TemplateManagement from './pages/TemplateManagement'
 import Reports from './pages/Reports'
 import UserManagement from './pages/UserManagement'
 import Login from './pages/Login'
-import api from './utils/api'
+import { supabase } from './utils/supabase'
 
 const ROLE_LABEL = { supervisor: 'Supervisor', team_leader: 'Team Leader', caretaker: 'Caretaker' }
 const ROLE_COLOR = { supervisor: '#0D7A71', team_leader: '#17A697', caretaker: '#FFC107' }
@@ -51,16 +51,15 @@ export default function App() {
 
   // Check existing session on mount
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
-    if (!token) { setAuthChecked(true); return }
-
-    api.get('/auth/me')
-      .then(res => setCurrentUser(res.data.user))
-      .catch(() => {
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('auth_user')
-      })
-      .finally(() => setAuthChecked(true))
+    const user = localStorage.getItem('auth_user')
+    if (!user) { setAuthChecked(true); return }
+    
+    try {
+      setCurrentUser(JSON.parse(user))
+    } catch {
+      localStorage.removeItem('auth_user')
+    }
+    setAuthChecked(true)
   }, [])
 
   // Load app data after auth
@@ -72,14 +71,19 @@ export default function App() {
     try {
       setLoading(true)
       const [usersRes, categoriesRes, sourcesRes] = await Promise.all([
-        api.get('/users'),
-        api.get('/users/categories'),
-        api.get('/users/sources')
+        supabase.from('users').select('*'),
+        supabase.from('activity_categories').select('*'),
+        supabase.from('activity_sources').select('*')
       ])
-      setUsers(usersRes.data)
-      setTeamLeaders(usersRes.data.filter(u => u.role === 'team_leader'))
-      setCategories(categoriesRes.data)
-      setSources(sourcesRes.data)
+      
+      if (usersRes.error) throw usersRes.error
+      if (categoriesRes.error) throw categoriesRes.error
+      if (sourcesRes.error) throw sourcesRes.error
+      
+      setUsers(usersRes.data || [])
+      setTeamLeaders((usersRes.data || []).filter(u => u.role === 'team_leader'))
+      setCategories(categoriesRes.data || [])
+      setSources(sourcesRes.data || [])
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally { setLoading(false) }
@@ -100,8 +104,6 @@ export default function App() {
 
   const handleLogout = async () => {
     if (!confirm('Logout dari aplikasi?')) return
-    try { await api.post('/auth/logout') } catch (e) {}
-    localStorage.removeItem('auth_token')
     localStorage.removeItem('auth_user')
     setCurrentUser(null)
     setCurrentPage('dashboard')
@@ -109,14 +111,16 @@ export default function App() {
 
   const handleAddCategory = async (name) => {
     try {
-      const res = await api.post('/users/categories', { name })
-      setCategories([...categories, res.data])
+      const { data, error } = await supabase.from('activity_categories').insert([{ name }]).select()
+      if (error) throw error
+      setCategories([...categories, data[0]])
     } catch (error) { console.error(error) }
   }
 
   const handleDeleteCategory = async (id) => {
     try {
-      await api.delete(`/users/categories/${id}`)
+      const { error } = await supabase.from('activity_categories').delete().eq('id', id)
+      if (error) throw error
       setCategories(categories.filter(cat => cat.id !== id))
     } catch (error) {
       console.error('Failed to delete category:', error)
@@ -126,8 +130,9 @@ export default function App() {
 
   const handleAddSource = async (name) => {
     try {
-      const res = await api.post('/users/sources', { name })
-      setSources([...sources, res.data])
+      const { data, error } = await supabase.from('activity_sources').insert([{ name }]).select()
+      if (error) throw error
+      setSources([...sources, data[0]])
     } catch (error) { console.error(error) }
   }
 

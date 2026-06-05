@@ -1,24 +1,42 @@
-import React, { useState } from 'react'
-import api from '../utils/api'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '../utils/supabase'
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Load users from Supabase
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  const loadUsers = async () => {
+    try {
+      const { data, error } = await supabase.from('users').select('*')
+      if (error) throw error
+      setUsers(data || [])
+    } catch (err) {
+      console.error('Error loading users:', err)
+    }
+  }
+
   const handleLogin = async (e) => {
     e.preventDefault()
-    if (!email || !password) { setError('Email dan password wajib diisi'); return }
+    if (!email.trim()) { setError('Pilih email untuk login'); return }
+    
     setLoading(true); setError('')
     try {
-      const res = await api.post('/auth/login', { email: email.trim(), password })
-      localStorage.setItem('auth_token', res.data.token)
-      localStorage.setItem('auth_user', JSON.stringify(res.data.user))
-      onLogin(res.data.user, res.data.token)
+      // Find user in database
+      const user = users.find(u => u.email === email)
+      if (!user) { setError('User tidak ditemukan'); setLoading(false); return }
+
+      // Store in localStorage and login
+      localStorage.setItem('auth_user', JSON.stringify(user))
+      onLogin(user)
     } catch (err) {
-      setError(err.response?.data?.error || 'Login gagal')
+      setError(err.message || 'Login gagal')
     } finally {
       setLoading(false)
     }
@@ -51,46 +69,29 @@ export default function Login({ onLogin }) {
         <div style={{ padding: '30px' }}>
           <h2 style={{ fontSize: '20px', marginBottom: '6px' }}>Login</h2>
           <p style={{ fontSize: '15px', color: 'var(--text-light)', marginBottom: '20px' }}>
-            Masukkan email dan password untuk mulai
+            Pilih user untuk mulai
           </p>
 
           <form onSubmit={handleLogin}>
             <div className="form-group">
-              <label>Email</label>
-              <input
-                type="email"
+              <label>Pilih User</label>
+              <select
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="nama@majoo.id"
-                required autoFocus autoComplete="email"
-                style={{ fontSize: '17px', padding: '10px 12px' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Password</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••"
-                  required autoComplete="current-password"
-                  style={{ fontSize: '17px', padding: '10px 42px 10px 12px', width: '100%' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    color: 'var(--text-light)', fontSize: '17px', padding: '4px 8px'
-                  }}
-                  title={showPassword ? 'Sembunyikan' : 'Tampilkan'}
-                >
-                  {showPassword ? '🙈' : '👁'}
-                </button>
-              </div>
+                required autoFocus
+                style={{
+                  fontSize: '15px', padding: '10px 12px',
+                  width: '100%', border: '1px solid var(--border)',
+                  borderRadius: '6px', fontFamily: 'inherit'
+                }}
+              >
+                <option value="">-- Pilih user --</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.email}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
             </div>
 
             {error && (
@@ -107,17 +108,14 @@ export default function Login({ onLogin }) {
             </button>
           </form>
 
-          {/* Demo password hint */}
+          {/* Info */}
           <div style={{
             marginTop: '20px', padding: '10px 12px',
-            background: '#fef3c7', color: '#92400e',
-            border: '1px solid #fcd34d', borderRadius: '6px',
-            fontSize: '14px', textAlign: 'center'
+            background: '#dbeafe', color: '#1e40af',
+            border: '1px solid #93c5fd', borderRadius: '6px',
+            fontSize: '13px'
           }}>
-            🔧 <strong>Default Password:</strong> <code style={{
-              background: 'white', padding: '2px 8px', borderRadius: '4px',
-              fontFamily: 'monospace', fontSize: '15px', fontWeight: 700
-            }}>122333</code>
+            ℹ️ Powered by <strong>Supabase</strong> · Data tersimpan di cloud
           </div>
         </div>
 
