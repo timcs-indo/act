@@ -150,13 +150,13 @@ export default function App() {
 
   // ── Render gates ──
   if (!authChecked) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Memeriksa session...</div>
+    return <LoadingScreen message="Memeriksa session..." />
   }
   if (!currentUser) {
     return <Login onLogin={handleLogin} />
   }
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading data...</div>
+    return <LoadingScreen message="Memuat data aplikasi..." />
   }
 
   return (
@@ -219,6 +219,22 @@ export default function App() {
           <UserManagement onDataUpdated={loadData} />
         )}
       </div>
+    </div>
+  )
+}
+
+function LoadingScreen({ message = 'Memuat...' }) {
+  return (
+    <div className="loading-screen">
+      <div className="loading-logo">📊</div>
+      <div className="loading-title">Productivity Tracker</div>
+      <div className="loading-text">{message}</div>
+      <div className="loading-dots">
+        <div className="loading-dot"></div>
+        <div className="loading-dot"></div>
+        <div className="loading-dot"></div>
+      </div>
+      <div className="loading-progress"></div>
     </div>
   )
 }
