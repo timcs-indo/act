@@ -559,11 +559,12 @@ function Sidebar({ currentPage, setCurrentPage, currentUser, onLogout, isOpen, o
   const menuItems = allMenuItems.filter(m => m.roles.includes(currentUser.role))
 
   return (
-    <div className={`sidebar ${isOpen ? 'mobile-open' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
         marginBottom: '20px', paddingBottom: '16px',
-        borderBottom: '1px solid var(--border)'
+        borderBottom: '1px solid var(--border)',
+        flexShrink: 0
       }}>
         {/* Majoo Official Logo */}
         <img
@@ -584,7 +585,8 @@ function Sidebar({ currentPage, setCurrentPage, currentUser, onLogout, isOpen, o
         marginBottom: '16px', padding: '12px 14px',
         background: 'linear-gradient(135deg, #4ECDC4 0%, #17A697 100%)',
         color: 'white', borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(23, 166, 151, 0.15)'
+        boxShadow: '0 2px 8px rgba(23, 166, 151, 0.15)',
+        flexShrink: 0
       }}>
         <div style={{ fontSize: '13px', fontWeight: 600, opacity: 0.9, marginBottom: '6px' }}>
           📅 {date}
@@ -594,7 +596,7 @@ function Sidebar({ currentPage, setCurrentPage, currentUser, onLogout, isOpen, o
         </div>
       </div>
 
-      <nav className="nav-menu" style={{ flex: 1 }}>
+      <nav className="nav-menu">
         {menuItems.map(item => (
           <button
             key={item.id}
@@ -660,12 +662,15 @@ function Sidebar({ currentPage, setCurrentPage, currentUser, onLogout, isOpen, o
         </a>
       </nav>
 
-      {/* User panel at bottom - fixed */}
+      {/* User panel at bottom - sticky */}
       <div style={{
-        position: 'fixed', bottom: 0, left: 0, width: '250px',
-        padding: '16px 20px', background: 'white',
+        padding: '16px 0', background: 'white',
         borderTop: '1px solid var(--border)',
-        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.05)'
+        marginLeft: '-20px', marginRight: '-20px', marginBottom: '-20px',
+        paddingLeft: '20px', paddingRight: '20px',
+        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.05)',
+        flexShrink: 0,
+        zIndex: 10
       }}>
         <div style={{
           padding: '10px', background: '#f8fafc', borderRadius: '6px',
