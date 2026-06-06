@@ -9,20 +9,25 @@ export const isDevelopment = () => {
   return !isProduction()
 }
 
+// Check if we should use Supabase mode (set via VITE_USE_SUPABASE env)
+// When VITE_USE_SUPABASE=true → use Supabase as backend (both local dev & production)
+// Otherwise → use Node.js backend at localhost:5000 (legacy)
+export const isSupabaseMode = () => {
+  return import.meta.env.VITE_USE_SUPABASE === 'true'
+}
+
 export const getApiBaseUrl = () => {
+  // If Supabase mode flag is set, return special marker
+  if (isSupabaseMode()) {
+    return 'supabase'
+  }
+  // Otherwise: use Node.js backend (only viable in local dev)
   if (isDevelopment()) {
     return 'http://localhost:5000/api'
   }
-  // Production - check if using Supabase
-  if (import.meta.env.VITE_USE_SUPABASE === 'true') {
-    return 'supabase'  // Special flag to indicate Supabase mode
-  }
+  // Production without Supabase: no backend
   return import.meta.env.VITE_API_URL || null
 }
 
-export const isSupabaseMode = () => {
-  return getApiBaseUrl() === 'supabase'
-}
-
 console.log(`[Environment] Running in ${isProduction() ? 'PRODUCTION' : 'DEVELOPMENT'} mode`)
-console.log(`[API Base URL] ${getApiBaseUrl() || 'Not available (Supabase mode)'}`)
+console.log(`[API Mode] ${isSupabaseMode() ? 'Supabase' : (getApiBaseUrl() || 'Not configured')}`)
