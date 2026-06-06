@@ -569,6 +569,57 @@ function Sidebar({ currentPage, setCurrentPage, currentUser, onLogout, isOpen, o
             {item.label}
           </button>
         ))}
+
+        {/* External links section */}
+        <div style={{
+          marginTop: '12px',
+          paddingTop: '12px',
+          borderTop: '1px solid var(--border)',
+          fontSize: '10px',
+          color: 'var(--text-light)',
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          padding: '0 0 8px 8px'
+        }}>
+          Tools Lainnya
+        </div>
+        <a
+          href="https://recordingfo-majoo.github.io/calendarCS/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            textDecoration: 'none',
+            color: 'var(--text)'
+          }}
+          title="Buka Calendar CS di tab baru"
+        >
+          <span style={{ fontSize: '16px' }}>👥</span>
+          <span>Calendar CS</span>
+          <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.5 }}>↗</span>
+        </a>
+        <a
+          href="https://zulfikardwi-cx.github.io/majoo-outlet-dashboard/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            textDecoration: 'none',
+            color: 'var(--text)'
+          }}
+          title="Buka Enterprise Dashboard di tab baru"
+        >
+          <span style={{ fontSize: '16px' }}>🏢</span>
+          <span>Enterprise</span>
+          <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.5 }}>↗</span>
+        </a>
       </nav>
 
       {/* User panel at bottom - fixed */}
