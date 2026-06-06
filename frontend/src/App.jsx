@@ -104,12 +104,18 @@ export default function App() {
     setCurrentUser(user)
   }
 
-  const handleLogout = async () => {
-    if (!confirm('Logout dari aplikasi?')) return
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
+  const handleLogout = () => {
+    setShowLogoutConfirm(true)
+  }
+
+  const confirmLogout = () => {
     localStorage.removeItem('auth_user')
     localStorage.removeItem('auth_token')
     setCurrentUser(null)
     setCurrentPage('dashboard')
+    setShowLogoutConfirm(false)
     toast.info('Anda telah logout')
   }
 
@@ -281,6 +287,75 @@ export default function App() {
         {currentPage === 'users' && currentUser.role === 'supervisor' && (
           <UserManagement onDataUpdated={loadData} />
         )}
+      </div>
+
+      {showLogoutConfirm && (
+        <LogoutConfirmModal
+          userName={currentUser?.name}
+          onConfirm={confirmLogout}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function LogoutConfirmModal({ userName, onConfirm, onCancel }) {
+  return (
+    <div onClick={onCancel} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 2000, padding: '20px'
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'white', borderRadius: '12px',
+        maxWidth: '400px', width: '100%',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+        overflow: 'hidden'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '20px 24px',
+          background: 'linear-gradient(90deg, #dc2626 0%, #b91c1c 100%)',
+          color: 'white'
+        }}>
+          <h3 style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            🚪 Konfirmasi Logout
+          </h3>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '24px' }}>
+          <p style={{ fontSize: '15px', color: 'var(--text)', marginBottom: '8px' }}>
+            Anda yakin ingin keluar dari aplikasi?
+          </p>
+          {userName && (
+            <p style={{ fontSize: '13px', color: 'var(--text-light)', marginBottom: '20px' }}>
+              Akun: <strong>{userName}</strong>
+            </p>
+          )}
+
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={onCancel}
+              className="btn btn-outline"
+              style={{ padding: '8px 20px' }}
+            >
+              Batal
+            </button>
+            <button
+              onClick={onConfirm}
+              className="btn"
+              style={{
+                background: '#dc2626', color: 'white',
+                padding: '8px 20px', border: 'none'
+              }}
+            >
+              🚪 Ya, Logout
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
