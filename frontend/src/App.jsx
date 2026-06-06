@@ -946,6 +946,52 @@ function GoogleCalendarButton() {
     } finally { setBusy(false) }
   }
 
+  const handleBulkCleanup = async () => {
+    const ok = await confirm.ask({
+      title: '🧹 Bersihkan Google Calendar',
+      message: 'Hapus SEMUA event di Google Calendar yang dibuat oleh aplikasi ini?\n\nHanya event dengan tag "Productivity Tracker" yang akan dihapus. Event manual Anda tidak terpengaruh.\n\nProses ini tidak bisa di-undo.',
+      confirmText: '🧹 Bersihkan Semua',
+      cancelText: 'Batal',
+      danger: true
+    })
+    if (!ok) return
+
+    setBusy(true)
+    toast.info('🧹 Mencari & menghapus event di Google Calendar...')
+
+    try {
+      const url = `${supabase.supabaseUrl}/functions/v1/google-cleanup`
+      const token = localStorage.getItem('auth_token')
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': supabase.supabaseKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Cleanup gagal')
+      }
+
+      const result = await res.json()
+      const { total_found, deleted_count, failed_count } = result
+
+      if (total_found === 0) {
+        toast.info('Tidak ada event Productivity Tracker yang ditemukan di Google Calendar')
+      } else {
+        toast.success(`✅ ${deleted_count} event berhasil dihapus dari Google Calendar${failed_count > 0 ? ` (${failed_count} gagal)` : ''}`)
+      }
+    } catch (e) {
+      toast.error('Gagal cleanup: ' + e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!status || !status.configured) return null
 
   if (status.connected) {
@@ -963,6 +1009,20 @@ function GoogleCalendarButton() {
             {status.google_email}
           </div>
         )}
+        <button
+          onClick={handleBulkCleanup}
+          disabled={busy}
+          style={{
+            marginTop: '6px', width: '100%', padding: '6px',
+            background: '#fff7ed', border: '1px solid #fdba74',
+            borderRadius: '6px', cursor: busy ? 'not-allowed' : 'pointer', fontSize: '12px',
+            color: '#c2410c', fontWeight: 600,
+            opacity: busy ? 0.6 : 1
+          }}
+          title="Hapus semua event yang dibuat aplikasi ini dari Google Calendar"
+        >
+          {busy ? '⏳ Memproses...' : '🧹 Bersihkan Calendar'}
+        </button>
         <button
           onClick={handleDisconnect}
           disabled={busy}

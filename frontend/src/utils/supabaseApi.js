@@ -1251,6 +1251,25 @@ const handlers = {
       throw new Error(err.error || `Failed to ${action} event`)
     }
     return await res.json()
+  },
+
+  async googleCleanup(payload = {}) {
+    const token = localStorage.getItem('auth_token')
+    const url = `${supabase.supabaseUrl}/functions/v1/google-cleanup`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabase.supabaseKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Failed to cleanup Google Calendar events')
+    }
+    return await res.json()
   }
 }
 
