@@ -425,7 +425,7 @@ const handlers = {
       .select(`
         id, team_leader_id, on_duty_user_id, activity_date,
         category_id, activity_name, duration, start_time, end_time,
-        source_id, notes, is_done,
+        source_id, notes, is_done, google_event_id, recurrence_group_id,
         users!daily_activities_on_duty_user_id_fkey(name, role),
         team_leaders:users!daily_activities_team_leader_id_fkey(name, area),
         activity_categories(name),
@@ -453,7 +453,9 @@ const handlers = {
       source_id: a.source_id,
       source_name: a.activity_sources?.name,
       notes: a.notes,
-      is_done: a.is_done || 0
+      is_done: a.is_done || 0,
+      google_event_id: a.google_event_id,
+      recurrence_group_id: a.recurrence_group_id
     }))
   },
 
@@ -587,24 +589,69 @@ const handlers = {
 
     // Sync to Google Calendar if requested
     if (body.sync_google_calendar) {
+      const GCAL_SYNC_LIMIT = 30
       try {
-        const fullAct = await fetchActivityForSync(id)
-        if (fullAct) {
-          const action = fullAct.google_event_id ? 'update' : 'create'
-          console.log(`[GCal Sync] ${action} for activity ${id}`)
-          const result = await callGoogleEventFunction(action, {
-            user_id: fullAct.on_duty_user_id,
-            activity: fullAct,
-            event_id: fullAct.google_event_id,
-            include_meet: true
-          })
-          console.log(`[GCal Sync] Result:`, result)
-          if (result?.event_id && result.event_id !== fullAct.google_event_id) {
-            await supabase
+        // Determine which activities to sync
+        let activitiesToSync = [{ id }]
+
+        if (body.recurrence_scope === 'all') {
+          // Get all activities in the recurrence group
+          const { data: existing } = await supabase
+            .from('daily_activities')
+            .select('id, recurrence_group_id')
+            .eq('id', id)
+            .single()
+
+          if (existing?.recurrence_group_id) {
+            const { data: groupActs } = await supabase
               .from('daily_activities')
-              .update({ google_event_id: result.event_id })
-              .eq('id', id)
+              .select('id')
+              .eq('recurrence_group_id', existing.recurrence_group_id)
+              .order('activity_date')
+            activitiesToSync = (groupActs || []).slice(0, GCAL_SYNC_LIMIT)
+            console.log(`[GCal Sync] Syncing ${activitiesToSync.length} activities from group`)
           }
+        }
+
+        // Sync each activity (parallel for speed)
+        const syncPromises = activitiesToSync.map(async ({ id: actId }) => {
+          try {
+            const fullAct = await fetchActivityForSync(actId)
+            if (!fullAct) return { success: false }
+            const action = fullAct.google_event_id ? 'update' : 'create'
+            const result = await callGoogleEventFunction(action, {
+              user_id: fullAct.on_duty_user_id,
+              activity: fullAct,
+              event_id: fullAct.google_event_id,
+              include_meet: true
+            })
+            if (result?.event_id && result.event_id !== fullAct.google_event_id) {
+              await supabase
+                .from('daily_activities')
+                .update({ google_event_id: result.event_id })
+                .eq('id', actId)
+            }
+            return { success: true }
+          } catch (e) {
+            console.error(`[GCal Sync] Failed for id=${actId}:`, e.message)
+            return { success: false, error: e.message }
+          }
+        })
+
+        const results = await Promise.all(syncPromises)
+        const failed = results.filter(r => !r.success).length
+        console.log(`[GCal Sync] Done. ${results.length - failed}/${results.length} synced`)
+
+        if (failed > 0 && failed === results.length) {
+          // All failed - show error
+          setTimeout(() => {
+            toast.warning(`Gagal sync ke Google Calendar`)
+          }, 500)
+        } else if (failed > 0) {
+          // Partial failure
+          setTimeout(() => {
+            toast.warning(`${results.length - failed} ter-sync, ${failed} gagal`)
+          }, 500)
         }
       } catch (e) {
         console.error(`[GCal Sync] Failed for update id=${id}:`, e.message)
