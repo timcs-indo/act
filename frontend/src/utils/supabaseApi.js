@@ -8,22 +8,37 @@ import toast from './toast'
  */
 
 // Helper: Generate dates based on recurrence pattern
-function generateRecurrenceDates(startDate, recurrence) {
+// If repeatEndDate is provided, generate until that date.
+// Otherwise, use default counts (28 daily, 20 weekday, 4 weekly, etc).
+// Safety cap: never more than 365 dates.
+function generateRecurrenceDates(startDate, recurrence, repeatEndDate = null) {
   const dates = [startDate]
   if (recurrence === 'none' || !recurrence) return dates
 
   const start = new Date(startDate)
   let current = new Date(start)
+  const endDate = repeatEndDate ? new Date(repeatEndDate) : null
+  const SAFETY_CAP = 365  // never generate more than 365 dates
+
+  const shouldContinue = (count, fallbackLimit) => {
+    if (count >= SAFETY_CAP) return false
+    if (endDate) return current < endDate
+    return count < fallbackLimit
+  }
 
   if (recurrence === 'daily') {
-    for (let i = 1; i < 28; i++) {
+    let count = 1
+    while (shouldContinue(count, 28)) {
       current.setDate(current.getDate() + 1)
+      if (endDate && current > endDate) break
       dates.push(current.toISOString().split('T')[0])
+      count++
     }
   } else if (recurrence === 'weekday') {
-    let count = 0
-    while (count < 20) {
+    let count = 1
+    while (shouldContinue(count, 21)) {  // 1 start + 20 = 21
       current.setDate(current.getDate() + 1)
+      if (endDate && current > endDate) break
       const d = current.getDay()
       if (d >= 1 && d <= 5) {
         dates.push(current.toISOString().split('T')[0])
@@ -31,24 +46,36 @@ function generateRecurrenceDates(startDate, recurrence) {
       }
     }
   } else if (recurrence === 'weekly') {
-    for (let i = 1; i < 4; i++) {
+    let count = 1
+    while (shouldContinue(count, 4)) {
       current.setDate(current.getDate() + 7)
+      if (endDate && current > endDate) break
       dates.push(current.toISOString().split('T')[0])
+      count++
     }
   } else if (recurrence === 'biweekly') {
-    for (let i = 1; i < 4; i++) {
+    let count = 1
+    while (shouldContinue(count, 4)) {
       current.setDate(current.getDate() + 14)
+      if (endDate && current > endDate) break
       dates.push(current.toISOString().split('T')[0])
+      count++
     }
   } else if (recurrence === 'monthly') {
-    for (let i = 1; i < 3; i++) {
+    let count = 1
+    while (shouldContinue(count, 3)) {
       current.setMonth(current.getMonth() + 1)
+      if (endDate && current > endDate) break
       dates.push(current.toISOString().split('T')[0])
+      count++
     }
   } else if (recurrence === 'yearly') {
-    for (let i = 1; i < 3; i++) {
+    let count = 1
+    while (shouldContinue(count, 3)) {
       current.setFullYear(current.getFullYear() + 1)
+      if (endDate && current > endDate) break
       dates.push(current.toISOString().split('T')[0])
+      count++
     }
   }
   return dates
@@ -430,7 +457,7 @@ const handlers = {
   },
 
   async createActivity(body) {
-    const dates = generateRecurrenceDates(body.activity_date, body.recurrence)
+    const dates = generateRecurrenceDates(body.activity_date, body.recurrence, body.repeat_end_date)
     const rows = dates.map(date => ({
       team_leader_id: body.team_leader_id,
       on_duty_user_id: body.on_duty_user_id,

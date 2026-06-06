@@ -41,7 +41,8 @@ const fmtDate = (d) => {
 
 const EMPTY_FORM = {
   on_duty_user_id: '', category_id: '', activity_name: '',
-  activity_date: '', start_time: '', end_time: '', duration: '', source_id: '', notes: '', recurrence: 'none', is_done: 0
+  activity_date: '', start_time: '', end_time: '', duration: '', source_id: '', notes: '',
+  recurrence: 'none', repeat_end_date: '', is_done: 0
 }
 
 export default function Activity({ teamLeaders, users = [], categories = [], sources = [], currentUser }) {
@@ -349,6 +350,7 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
     source_id: formData.source_id ? parseInt(formData.source_id) : null,
     notes: formData.notes || null,
     recurrence: formData.recurrence || 'none',
+    repeat_end_date: formData.repeat_end_date || null,
     is_done: formData.is_done !== undefined ? parseInt(formData.is_done) : 0
   })
 
@@ -1110,23 +1112,36 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
                   💡 Boleh backdate/backclock. Auto-calculate antara jam mulai, jam selesai, dan durasi.
                 </div>
 
-                <div className="form-group">
-                  <label>Pengulangan</label>
-                  <select value={formData.recurrence || 'none'} onChange={e => setFormData({ ...formData, recurrence: e.target.value })}>
-                    <option value="none">Tidak ada pengulangan</option>
-                    <option value="daily">Setiap hari</option>
-                    <option value="weekday">Setiap hari kerja (Senin-Jumat)</option>
-                    <option value="weekly">Setiap minggu</option>
-                    <option value="biweekly">Setiap 2 minggu</option>
-                    <option value="monthly">Setiap bulan</option>
-                    <option value="yearly">Setiap tahun</option>
-                  </select>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Pengulangan</label>
+                    <select value={formData.recurrence || 'none'} onChange={e => setFormData({ ...formData, recurrence: e.target.value })}>
+                      <option value="none">Tidak ada pengulangan</option>
+                      <option value="daily">Setiap hari</option>
+                      <option value="weekday">Setiap hari kerja (Senin-Jumat)</option>
+                      <option value="weekly">Setiap minggu</option>
+                      <option value="biweekly">Setiap 2 minggu</option>
+                      <option value="monthly">Setiap bulan</option>
+                      <option value="yearly">Setiap tahun</option>
+                    </select>
+                  </div>
                   {formData.recurrence && formData.recurrence !== 'none' && (
-                    <div style={{ fontSize: '11px', color: '#0D7A71', marginTop: '6px', fontWeight: 500 }}>
-                      ℹ️ Aktivitas akan dibuat berulang sesuai pilihan
+                    <div className="form-group">
+                      <label>Batas Tanggal Pengulangan</label>
+                      <input
+                        type="date"
+                        value={formData.repeat_end_date || ''}
+                        onChange={e => setFormData({ ...formData, repeat_end_date: e.target.value })}
+                        min={formData.activity_date || today}
+                      />
                     </div>
                   )}
                 </div>
+                {formData.recurrence && formData.recurrence !== 'none' && (
+                  <div style={{ fontSize: '11px', color: '#0D7A71', marginBottom: '14px', fontWeight: 500 }}>
+                    ℹ️ Aktivitas akan dibuat berulang dari {formData.activity_date || today} sampai {formData.repeat_end_date || '(set batas tanggal)'}
+                  </div>
+                )}
 
                 <div className="form-row">
                   <div className="form-group">

@@ -22,6 +22,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
   const [handoverTasks, setHandoverTasks] = useState([])
   const [outgoingHandovers, setOutgoingHandovers] = useState([])
   const [teamUsers, setTeamUsers] = useState([])
+  const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(false)
   
   // Local state to track inline duration edits before saving
@@ -121,6 +122,49 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
       loadActivities()
     }
   }, [selectedDate, currentUser?.id])
+
+  // Load templates for current user's team
+  useEffect(() => {
+    if (currentUser?.id) {
+      loadTemplates()
+    }
+  }, [currentUser?.id])
+
+  const loadTemplates = async () => {
+    try {
+      // Determine team_leader_id based on current user's role
+      let teamLeaderId = null
+      if (currentUser?.role === 'team_leader') {
+        teamLeaderId = currentUser.id
+      } else if (currentUser?.role === 'caretaker') {
+        teamLeaderId = currentUser.team_leader_id
+      } else if (teamLeaders && teamLeaders.length > 0) {
+        teamLeaderId = teamLeaders[0].id  // supervisor uses first TL
+      }
+      if (!teamLeaderId) return
+      const res = await api.get(`/templates/${teamLeaderId}`)
+      setTemplates(res.data || [])
+    } catch (err) {
+      console.error('Failed to load templates:', err)
+    }
+  }
+
+  // Apply template to current form
+  const handleUseTemplate = (tpl) => {
+    const newDuration = tpl.duration.toString()
+    const newEndTime = calculateEndTime(createForm.start_time, newDuration)
+    setCreateForm(prev => ({
+      ...prev,
+      category_id: tpl.category_id?.toString() || '',
+      activity_name: tpl.activity_name || '',
+      duration: newDuration,
+      end_time: newEndTime,
+      source_id: tpl.source_id ? tpl.source_id.toString() : '',
+      // Auto-fill notes from template (only if user hasn't typed yet)
+      notes: prev.notes && prev.notes.trim() ? prev.notes : (tpl.notes || '')
+    }))
+    toast.info(`Template "${tpl.activity_name}" diterapkan`)
+  }
 
   const loadActivities = async () => {
     try {
@@ -1120,7 +1164,49 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
             <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>
               {editingActivityId ? '✏️ Edit Aktivitas' : '➕ Tambah Aktivitas Baru'}
             </h3>
-            
+
+            {/* Template selector (only for create, not edit, and not handover) */}
+            {!editingActivityId && !isHandoverMode && templates.length > 0 && (
+              <div style={{
+                marginBottom: '20px', padding: '12px',
+                background: '#f8fafc', borderRadius: '8px',
+                border: '1px solid var(--border)'
+              }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '10px' }}>
+                  ⚡ Pilih Template (Opsional)
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {templates.map(tpl => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => handleUseTemplate(tpl)}
+                      title={tpl.notes ? `📝 ${tpl.notes}` : `Klik untuk pakai template: ${tpl.duration}m`}
+                      style={{
+                        padding: '5px 10px', fontSize: '12px',
+                        border: '1px solid var(--border)', borderRadius: '4px',
+                        background: 'white', cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#e0f7f5'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                    >
+                      <span style={{ color: 'var(--text-light)', marginRight: '4px' }}>
+                        [{tpl.category_name}]
+                      </span>
+                      {tpl.activity_name}
+                      <span style={{ marginLeft: '6px', color: '#17A697', fontWeight: 700 }}>
+                        {tpl.duration}m
+                      </span>
+                      {tpl.is_global && (
+                        <span style={{ marginLeft: '4px', fontSize: '10px' }} title="Semua Area">🌐</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleCreateActivity}>
               {/* Activity Name */}
               <div style={{ marginBottom: '15px' }}>
