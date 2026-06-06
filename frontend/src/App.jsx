@@ -313,15 +313,17 @@ function ConfirmContainer() {
 
   if (!config) return null
 
+  const isChoice = config.type === 'choice'
+
   return (
-    <div onClick={() => confirm.cancel()} style={{
+    <div onClick={() => isChoice ? confirm.selectOption(null) : confirm.cancel()} style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 3000, padding: '20px'
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: 'white', borderRadius: '12px',
-        maxWidth: '420px', width: '100%',
+        maxWidth: '440px', width: '100%',
         boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
         overflow: 'hidden'
       }}>
@@ -340,32 +342,68 @@ function ConfirmContainer() {
 
         {/* Body */}
         <div style={{ padding: '24px' }}>
-          <p style={{ fontSize: '15px', color: 'var(--text)', marginBottom: '20px', lineHeight: 1.5 }}>
+          <p style={{ fontSize: '15px', color: 'var(--text)', marginBottom: '20px', lineHeight: 1.5, whiteSpace: 'pre-line' }}>
             {config.message}
           </p>
 
-          {/* Buttons */}
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => confirm.cancel()}
-              className="btn btn-outline"
-              style={{ padding: '8px 20px' }}
-            >
-              {config.cancelText}
-            </button>
-            <button
-              onClick={() => confirm.confirm()}
-              className="btn"
-              style={{
-                background: config.danger ? '#dc2626' : '#17A697',
-                color: 'white',
-                padding: '8px 20px',
-                border: 'none'
-              }}
-            >
-              {config.confirmText}
-            </button>
-          </div>
+          {/* Choice mode: vertical list of options + cancel button */}
+          {isChoice ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {config.options.map((opt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => confirm.selectOption(opt.value)}
+                  className="btn"
+                  style={{
+                    background: opt.danger ? '#dc2626' : '#17A697',
+                    color: 'white',
+                    padding: '12px 16px',
+                    border: 'none',
+                    width: '100%',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '14px',
+                    fontWeight: 600
+                  }}
+                >
+                  {opt.icon && <span>{opt.icon}</span>}
+                  <span style={{ flex: 1 }}>{opt.label}</span>
+                </button>
+              ))}
+              <button
+                onClick={() => confirm.selectOption(null)}
+                className="btn btn-outline"
+                style={{ padding: '10px 16px', marginTop: '4px' }}
+              >
+                {config.cancelText}
+              </button>
+            </div>
+          ) : (
+            /* Regular confirm: 2 buttons horizontal */
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => confirm.cancel()}
+                className="btn btn-outline"
+                style={{ padding: '8px 20px' }}
+              >
+                {config.cancelText}
+              </button>
+              <button
+                onClick={() => confirm.confirm()}
+                className="btn"
+                style={{
+                  background: config.danger ? '#dc2626' : '#17A697',
+                  color: 'white',
+                  padding: '8px 20px',
+                  border: 'none'
+                }}
+              >
+                {config.confirmText}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

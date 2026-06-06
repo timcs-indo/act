@@ -358,12 +358,35 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
     e?.preventDefault?.()
     if (!validateForm()) return
     try {
-      const payload = { ...baseActivityPayload(), sync_google_calendar: syncGoogle }
+      let payload = { ...baseActivityPayload(), sync_google_calendar: syncGoogle }
       let response
       let actionLabel = ''
       if (editingActivityId) {
+        // Check if this is a recurring activity
+        const existingActivity = calendarActivities.find(a => a.id === editingActivityId) ||
+                                  activities.find(a => a.id === editingActivityId)
+        const isRecurring = !!existingActivity?.recurrence_group_id
+
+        if (isRecurring) {
+          // Ask scope: this only or all
+          const choice = await confirm.askChoice({
+            title: 'Aktivitas Berulang',
+            message: 'Ini adalah aktivitas berulang. Update yang mana?',
+            icon: '🔁',
+            options: [
+              { label: '✏️ Update aktivitas ini saja', value: 'single' },
+              { label: '✏️ Update semua aktivitas berulang', value: 'all' }
+            ],
+            cancelText: 'Batal'
+          })
+          if (!choice) return
+          payload.recurrence_scope = choice
+        }
+
         response = await api.put(`/activities/${editingActivityId}`, payload)
-        actionLabel = 'Aktivitas berhasil diupdate'
+        actionLabel = payload.recurrence_scope === 'all'
+          ? 'Semua aktivitas berulang berhasil diupdate'
+          : 'Aktivitas berhasil diupdate'
       } else if (processingTaskId) {
         response = await api.post(`/tasks/${processingTaskId}/process`, {
           ...payload,
@@ -425,17 +448,47 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
   }
 
   const handleDeleteActivity = async (id) => {
-    const ok = await confirm.ask({
-      title: 'Hapus Aktivitas',
-      message: 'Yakin ingin menghapus aktivitas ini?',
-      confirmText: '🗑 Hapus',
-      cancelText: 'Batal',
-      danger: true
-    })
-    if (!ok) return
+    // Find activity to check if it's part of a recurring series
+    const activity = calendarActivities.find(a => a.id === id) ||
+                     activities.find(a => a.id === id)
+    const isRecurring = !!activity?.recurrence_group_id
+
+    let scope = 'single'
+    if (isRecurring) {
+      // Show Google Calendar-style 3-way choice
+      const choice = await confirm.askChoice({
+        title: 'Aktivitas Berulang',
+        message: 'Ini adalah aktivitas berulang. Apa yang ingin Anda hapus?',
+        icon: '🔁',
+        danger: true,
+        options: [
+          { label: '🗑 Hapus aktivitas ini saja', value: 'single', danger: true },
+          { label: '🗑 Hapus semua aktivitas berulang', value: 'all', danger: true }
+        ],
+        cancelText: 'Batal'
+      })
+      if (!choice) return
+      scope = choice
+    } else {
+      // Non-recurring: simple confirm
+      const ok = await confirm.ask({
+        title: 'Hapus Aktivitas',
+        message: 'Yakin ingin menghapus aktivitas ini?',
+        confirmText: '🗑 Hapus',
+        cancelText: 'Batal',
+        danger: true
+      })
+      if (!ok) return
+    }
+
     try {
-      await api.delete(`/activities/${id}`)
-      toast.success('Aktivitas berhasil dihapus')
+      const res = await api.delete(`/activities/${id}`, { data: { recurrence_scope: scope } })
+      const count = res.data?.deleted_count || 1
+      if (scope === 'all' && count > 1) {
+        toast.success(`${count} aktivitas berulang berhasil dihapus`)
+      } else {
+        toast.success('Aktivitas berhasil dihapus')
+      }
       loadAll()
     } catch (err) {
       toast.error('Gagal menghapus aktivitas')

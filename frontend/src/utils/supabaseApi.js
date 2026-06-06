@@ -383,7 +383,7 @@ const handlers = {
       .select(`
         id, team_leader_id, on_duty_user_id, activity_date,
         category_id, activity_name, duration, start_time, end_time,
-        source_id, notes, is_done, google_event_id,
+        source_id, notes, is_done, google_event_id, recurrence_group_id,
         users!daily_activities_on_duty_user_id_fkey(name, role),
         activity_categories(name),
         activity_sources(name)
@@ -413,7 +413,8 @@ const handlers = {
       source_name: a.activity_sources?.name,
       notes: a.notes,
       is_done: a.is_done || 0,
-      google_event_id: a.google_event_id
+      google_event_id: a.google_event_id,
+      recurrence_group_id: a.recurrence_group_id
     }))
   },
 
@@ -458,6 +459,12 @@ const handlers = {
 
   async createActivity(body) {
     const dates = generateRecurrenceDates(body.activity_date, body.recurrence, body.repeat_end_date)
+
+    // Generate recurrence_group_id only if multiple dates (recurring)
+    const recurrenceGroupId = dates.length > 1
+      ? `rec_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+      : null
+
     const rows = dates.map(date => ({
       team_leader_id: body.team_leader_id,
       on_duty_user_id: body.on_duty_user_id,
@@ -469,7 +476,8 @@ const handlers = {
       end_time: body.end_time || null,
       source_id: body.source_id || null,
       notes: body.notes || null,
-      is_done: body.is_done ? 1 : 0
+      is_done: body.is_done ? 1 : 0,
+      recurrence_group_id: recurrenceGroupId
     }))
     const { data, error } = await supabase.from('daily_activities').insert(rows).select()
     if (error) throw error
@@ -530,10 +538,6 @@ const handlers = {
       notes: body.notes || null,
       updated_at: new Date().toISOString()
     }
-    // Include activity_date if provided (for moving activity to different date)
-    if (body.activity_date) {
-      payload.activity_date = body.activity_date
-    }
     // Include team_leader_id if provided (for moving between teams)
     if (body.team_leader_id) {
       payload.team_leader_id = body.team_leader_id
@@ -542,8 +546,37 @@ const handlers = {
     if (body.is_done !== undefined) {
       payload.is_done = body.is_done ? 1 : 0
     }
-    const { error } = await supabase.from('daily_activities').update(payload).eq('id', id)
-    if (error) throw error
+
+    // Recurrence scope: 'single' (default) updates only this row,
+    // 'all' updates all rows in the recurrence group
+    if (body.recurrence_scope === 'all') {
+      // Get this activity's recurrence_group_id
+      const { data: existingActivity } = await supabase
+        .from('daily_activities')
+        .select('recurrence_group_id, activity_date')
+        .eq('id', id)
+        .single()
+
+      if (existingActivity?.recurrence_group_id) {
+        // Don't change activity_date when applying to all
+        // (otherwise all would have same date - we want to preserve per-occurrence dates)
+        const { error } = await supabase
+          .from('daily_activities')
+          .update(payload)
+          .eq('recurrence_group_id', existingActivity.recurrence_group_id)
+        if (error) throw error
+      } else {
+        // Not part of a group, just update this one
+        if (body.activity_date) payload.activity_date = body.activity_date
+        const { error } = await supabase.from('daily_activities').update(payload).eq('id', id)
+        if (error) throw error
+      }
+    } else {
+      // Single update - include activity_date if user moved it
+      if (body.activity_date) payload.activity_date = body.activity_date
+      const { error } = await supabase.from('daily_activities').update(payload).eq('id', id)
+      if (error) throw error
+    }
 
     // Sync to Google Calendar if requested
     if (body.sync_google_calendar) {
@@ -577,8 +610,49 @@ const handlers = {
     return { success: true }
   },
 
-  async deleteActivity(id) {
-    // Get activity first to know if it has a Google event to delete
+  async deleteActivity(id, options = {}) {
+    const scope = options.recurrence_scope || 'single'
+
+    if (scope === 'all') {
+      // Get the recurrence_group_id
+      const { data: existingActivity } = await supabase
+        .from('daily_activities')
+        .select('id, recurrence_group_id, on_duty_user_id, google_event_id')
+        .eq('id', id)
+        .single()
+
+      if (existingActivity?.recurrence_group_id) {
+        // Get all activities in this group (to delete Google events)
+        const { data: groupActs } = await supabase
+          .from('daily_activities')
+          .select('id, on_duty_user_id, google_event_id')
+          .eq('recurrence_group_id', existingActivity.recurrence_group_id)
+
+        // Delete Google events for each
+        for (const act of (groupActs || [])) {
+          if (act.google_event_id) {
+            try {
+              await callGoogleEventFunction('delete', {
+                user_id: act.on_duty_user_id,
+                event_id: act.google_event_id
+              })
+            } catch (e) {
+              console.error(`Google sync (delete id=${act.id}) failed:`, e.message)
+            }
+          }
+        }
+
+        // Delete all rows in the group
+        const { error } = await supabase
+          .from('daily_activities')
+          .delete()
+          .eq('recurrence_group_id', existingActivity.recurrence_group_id)
+        if (error) throw error
+        return { success: true, deleted_count: groupActs?.length || 1 }
+      }
+    }
+
+    // Single delete (default)
     try {
       const act = await fetchActivityForSync(id)
       if (act?.google_event_id) {
@@ -595,7 +669,7 @@ const handlers = {
 
     const { error } = await supabase.from('daily_activities').delete().eq('id', id)
     if (error) throw error
-    return { success: true }
+    return { success: true, deleted_count: 1 }
   },
 
   // ── TASKS (Handover) ──
@@ -1281,7 +1355,7 @@ class SupabaseAPI {
     }
   }
 
-  async delete(endpoint) {
+  async delete(endpoint, config = {}) {
     try {
       // Users
       const userMatch = endpoint.match(/^\/users\/(\d+)$/)
@@ -1293,9 +1367,9 @@ class SupabaseAPI {
       const srcMatch = endpoint.match(/^\/users\/sources\/(\d+)$/)
       if (srcMatch) return ok(await handlers.deleteSource(srcMatch[1]))
 
-      // Activities
+      // Activities (with recurrence scope option from config.data)
       const actMatch = endpoint.match(/^\/activities\/(\d+)$/)
-      if (actMatch) return ok(await handlers.deleteActivity(actMatch[1]))
+      if (actMatch) return ok(await handlers.deleteActivity(actMatch[1], config.data || {}))
 
       // Tasks
       const taskMatch = endpoint.match(/^\/tasks\/(\d+)$/)

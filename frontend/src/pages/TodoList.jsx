@@ -364,21 +364,45 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
 
   // Handle Delete Activity
   const handleDeleteActivity = async (act) => {
-    const ok = await confirm.ask({
-      title: 'Hapus Aktivitas',
-      message: `Yakin ingin menghapus aktivitas "${act.activity_name}"?`,
-      confirmText: '🗑 Hapus',
-      cancelText: 'Batal',
-      danger: true
-    })
-    if (!ok) return
+    const isRecurring = !!act.recurrence_group_id
+    let scope = 'single'
+
+    if (isRecurring) {
+      const choice = await confirm.askChoice({
+        title: 'Aktivitas Berulang',
+        message: `"${act.activity_name}" adalah aktivitas berulang. Apa yang ingin Anda hapus?`,
+        icon: '🔁',
+        danger: true,
+        options: [
+          { label: '🗑 Hapus aktivitas ini saja', value: 'single', danger: true },
+          { label: '🗑 Hapus semua aktivitas berulang', value: 'all', danger: true }
+        ],
+        cancelText: 'Batal'
+      })
+      if (!choice) return
+      scope = choice
+    } else {
+      const ok = await confirm.ask({
+        title: 'Hapus Aktivitas',
+        message: `Yakin ingin menghapus aktivitas "${act.activity_name}"?`,
+        confirmText: '🗑 Hapus',
+        cancelText: 'Batal',
+        danger: true
+      })
+      if (!ok) return
+    }
 
     setSavingId(act.id)
     try {
-      console.log(`🗑️ Deleting activity ${act.id}`)
-      await api.delete(`/activities/${act.id}`)
-      console.log(`✅ Activity deleted`)
-      toast.success('Aktivitas berhasil dihapus')
+      console.log(`🗑️ Deleting activity ${act.id} (scope: ${scope})`)
+      const res = await api.delete(`/activities/${act.id}`, { data: { recurrence_scope: scope } })
+      const count = res.data?.deleted_count || 1
+      console.log(`✅ Activity deleted (${count} rows)`)
+      if (scope === 'all' && count > 1) {
+        toast.success(`${count} aktivitas berulang berhasil dihapus`)
+      } else {
+        toast.success('Aktivitas berhasil dihapus')
+      }
       await loadActivities()
     } catch (err) {
       console.error(`❌ Error deleting activity:`, err)
@@ -539,6 +563,29 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
       } else {
         // Normal: create or update activity for self
         if (editingActivityId) {
+          // Check if this is a recurring activity
+          const existingActivity = activities.find(a => a.id === editingActivityId)
+          const isRecurring = !!existingActivity?.recurrence_group_id
+
+          let recurrenceScope = 'single'
+          if (isRecurring) {
+            const choice = await confirm.askChoice({
+              title: 'Aktivitas Berulang',
+              message: 'Ini adalah aktivitas berulang. Update yang mana?',
+              icon: '🔁',
+              options: [
+                { label: '✏️ Update aktivitas ini saja', value: 'single' },
+                { label: '✏️ Update semua aktivitas berulang', value: 'all' }
+              ],
+              cancelText: 'Batal'
+            })
+            if (!choice) {
+              setCreatingActivity(false)
+              return
+            }
+            recurrenceScope = choice
+          }
+
           // UPDATE existing activity
           const payload = {
             activity_date: createForm.activity_date,
@@ -550,15 +597,19 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
             source_id: createForm.source_id ? parseInt(createForm.source_id) : null,
             notes: createForm.notes,
             is_done: 0,
-            sync_google_calendar: syncGoogle
+            sync_google_calendar: syncGoogle,
+            recurrence_scope: recurrenceScope
           }
 
-          console.log(`📝 [${new Date().toLocaleTimeString()}] Updating activity ${editingActivityId}:`, payload)
+          console.log(`📝 [${new Date().toLocaleTimeString()}] Updating activity ${editingActivityId} (scope: ${recurrenceScope}):`, payload)
           const response = await api.put(`/activities/${editingActivityId}`, payload)
           console.log(`✅ [${new Date().toLocaleTimeString()}] PUT response:`, response)
+          const baseMsg = recurrenceScope === 'all'
+            ? 'Semua aktivitas berulang berhasil diperbarui'
+            : 'Aktivitas berhasil diperbarui'
           toast.success(syncGoogle
-            ? 'Aktivitas berhasil diperbarui & disinkronkan ke Google Calendar'
-            : 'Aktivitas berhasil diperbarui')
+            ? `${baseMsg} & disinkronkan ke Google Calendar`
+            : baseMsg)
         } else {
           // CREATE new activity
           // Determine team_leader_id based on current user's role

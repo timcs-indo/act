@@ -48,7 +48,22 @@
       "Bash(curl -s http://localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"aan@majoo.id\",\"password\":\"122333\"}')",
       "Bash(node -e \"const db = require\\('./database'\\); const users = db.prepare\\('SELECT id, name, email, role FROM users'\\).all\\(\\); console.log\\(JSON.stringify\\(users, null, 2\\)\\)\")",
       "Bash(curl -s http://localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"aan.sayudi@majoo.id\",\"password\":\"122333\"}')",
-      "Bash(cp \"/home/aan/Downloads/majoo-logo-sm.35999b781f5778d5c453.svg\" \"/home/aan/Claude Project/Productivity/frontend/public/logo-majoo.svg\")"
+      "Bash(cp \"/home/aan/Downloads/majoo-logo-sm.35999b781f5778d5c453.svg\" \"/home/aan/Claude Project/Productivity/frontend/public/logo-majoo.svg\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'Fix GitHub Pages deployment workflow *)",
+      "Bash(git commit -m 'Use official GitHub Pages action for reliable deployment *)",
+      "Bash(git commit -m 'Fix Majoo logo 404 - use Vite BASE_URL for correct path *)",
+      "Bash(git commit -m 'Fix change password verification + add explicit RLS policies *)",
+      "Bash(git commit -m 'Change password by email instead of ID *)",
+      "Bash(git commit -m 'Add detailed login error message for debugging password mismatch *)",
+      "Bash(git commit -m 'Fix Login.jsx to use custom auth instead of Supabase Auth *)",
+      "Bash(git commit -m 'Clean up debug logs - use simple error messages *)",
+      "Bash(git commit -m 'Remove role badge from user panel in sidebar *)",
+      "Bash(git commit -m 'Show Google Calendar button in production mode *)",
+      "Bash(git commit *)",
+      "Bash(grep -n \"</div>\\\\s*$\" \"/home/aan/Claude Project/Productivity/frontend/src/App.jsx\")"
     ]
   }
 }

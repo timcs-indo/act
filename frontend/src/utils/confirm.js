@@ -58,11 +58,34 @@ const resolve = (result) => {
   }
 }
 
+// askChoice: Multiple options modal (e.g., Google Calendar style "Single / All")
+// options: [{ label, value, danger?, icon? }]
+// Returns: selected value or null on cancel
+const askChoice = (config) => {
+  return new Promise((resolve) => {
+    if (currentResolve) currentResolve(null)
+
+    currentConfig = {
+      type: 'choice',
+      title: config.title || 'Pilih',
+      message: config.message || 'Pilih salah satu opsi',
+      options: config.options || [],
+      cancelText: config.cancelText || 'Batal',
+      icon: config.icon || '❓',
+      danger: config.danger || false
+    }
+    currentResolve = resolve
+    notify()
+  })
+}
+
 const confirmHelper = {
   subscribe,
   ask,
+  askChoice,
   confirm: () => resolve(true),
-  cancel: () => resolve(false)
+  cancel: () => resolve(false),
+  selectOption: (value) => resolve(value)
 }
 
 export default confirmHelper
