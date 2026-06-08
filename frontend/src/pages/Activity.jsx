@@ -693,7 +693,7 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
           💡 Klik area kosong di baris <strong style={{ color: '#16a34a' }}>👤 Anda</strong> untuk menambah aktivitas. Aktivitas user lain hanya bisa dilihat (read-only).
         </div>
 
-        <div style={{ overflowX: 'auto', overflowY: 'hidden', maxHeight: '500px', position: 'relative' }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '500px', position: 'relative' }}>
           <div style={{ minWidth: USER_COL_WIDTH + totalWidth, position: 'relative' }}>
             {/* Current time indicator line */}
             {currentTimePos !== null && (
