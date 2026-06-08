@@ -68,45 +68,66 @@ export default function TemplateManagement({ teamLeaders, users = [], categories
     }
 
     // Determine team_leader_id based on visibility
-    // - 'all': team_leader_id = null (visible to all areas)
-    // - 'self': team_leader_id = current user's team
     let teamLeaderId = null
     if (formData.visibility === 'self') {
       if (currentUser?.role === 'team_leader') teamLeaderId = currentUser.id
       else if (currentUser?.role === 'caretaker') teamLeaderId = currentUser.team_leader_id
-      else teamLeaderId = selectedTeamLeader  // supervisor uses currently filtered team
+      else teamLeaderId = selectedTeamLeader
     }
 
     try {
-      await api.post('/templates', {
-        team_leader_id: teamLeaderId,
-        category_id: parseInt(formData.category_id),
-        activity_name: formData.activity_name.trim(),
-        duration: parseInt(formData.duration),
-        source_id: formData.source_id ? parseInt(formData.source_id) : null,
-        notes: formData.notes.trim() || null,
-        created_by_user_id: currentUser?.id || null
-      })
-      const visibilityText = formData.visibility === 'all' ? ' (Semua Area)' : ''
-      toast.success(`Template "${formData.activity_name.trim()}" berhasil disimpan${visibilityText}`)
+      if (editingId) {
+        // UPDATE existing template
+        await api.put(`/templates/${editingId}`, {
+          team_leader_id: teamLeaderId,
+          category_id: parseInt(formData.category_id),
+          activity_name: formData.activity_name.trim(),
+          duration: parseInt(formData.duration),
+          source_id: formData.source_id ? parseInt(formData.source_id) : null,
+          notes: formData.notes.trim() || null
+        })
+        const visibilityText = formData.visibility === 'all' ? ' (Semua Area)' : ''
+        toast.success(`Template "${formData.activity_name.trim()}" berhasil diupdate${visibilityText}`)
+      } else {
+        // CREATE new template
+        await api.post('/templates', {
+          team_leader_id: teamLeaderId,
+          category_id: parseInt(formData.category_id),
+          activity_name: formData.activity_name.trim(),
+          duration: parseInt(formData.duration),
+          source_id: formData.source_id ? parseInt(formData.source_id) : null,
+          notes: formData.notes.trim() || null,
+          created_by_user_id: currentUser?.id || null
+        })
+        const visibilityText = formData.visibility === 'all' ? ' (Semua Area)' : ''
+        toast.success(`Template "${formData.activity_name.trim()}" berhasil disimpan${visibilityText}`)
+      }
       setFormData({ category_id: '', activity_name: '', duration: '', source_id: '', notes: '', visibility: 'self' })
+      setEditingId(null)
       setFormOpen(false)
       loadTemplates()
     } catch (error) {
-      console.error('Failed to add template:', error)
-      toast.error('Gagal menambahkan template: ' + (error.response?.data?.error || error.message))
+      console.error('Failed to save template:', error)
+      toast.error('Gagal menyimpan template: ' + (error.response?.data?.error || error.message))
     }
   }
 
   const handleStartEdit = (tpl) => {
+    // Open the main form in edit mode, pre-filled with template data
     setEditingId(tpl.id)
-    setEditData({
+    setFormData({
+      category_id: tpl.category_id ? tpl.category_id.toString() : '',
       activity_name: tpl.activity_name || '',
-      category_id: tpl.category_id || '',
-      duration: tpl.duration,
-      source_id: tpl.source_id || '',
-      notes: tpl.notes || ''
+      duration: tpl.duration ? tpl.duration.toString() : '',
+      source_id: tpl.source_id ? tpl.source_id.toString() : '',
+      notes: tpl.notes || '',
+      visibility: tpl.is_global ? 'all' : 'self'
     })
+    setFormOpen(true)
+    // Scroll to form for better UX
+    setTimeout(() => {
+      document.querySelector('form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }
 
   const handleSaveEdit = async (id) => {
@@ -267,7 +288,13 @@ export default function TemplateManagement({ teamLeaders, users = [], categories
 
       <div className="card mb-20">
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="btn btn-primary" onClick={() => setFormOpen(!formOpen)}>
+          <button className="btn btn-primary" onClick={() => {
+            if (formOpen) {
+              setEditingId(null)
+              setFormData({ category_id: '', activity_name: '', duration: '', source_id: '', notes: '', visibility: 'self' })
+            }
+            setFormOpen(!formOpen)
+          }}>
             {formOpen ? '✕ Batal' : '+ Tambah Template'}
           </button>
         </div>
@@ -275,7 +302,7 @@ export default function TemplateManagement({ teamLeaders, users = [], categories
 
       {formOpen && (
         <div className="card mb-20">
-          <h3 style={{ marginBottom: '20px' }}>Tambah Template Baru</h3>
+          <h3 style={{ marginBottom: '20px' }}>{editingId ? '✏️ Edit Template' : 'Tambah Template Baru'}</h3>
           <form onSubmit={handleAddTemplate}>
             <div className="form-row">
               <div className="form-group">
@@ -408,7 +435,9 @@ export default function TemplateManagement({ teamLeaders, users = [], categories
               </div>
             </div>
 
-            <button type="submit" className="btn btn-success" style={{ marginTop: '20px' }}>✓ Simpan Template</button>
+            <button type="submit" className="btn btn-success" style={{ marginTop: '20px' }}>
+              {editingId ? '✓ Update Template' : '✓ Simpan Template'}
+            </button>
           </form>
         </div>
       )}
@@ -451,43 +480,7 @@ export default function TemplateManagement({ teamLeaders, users = [], categories
                 <tbody>
                   {items.map(tpl => (
                     <tr key={tpl.id}>
-                      {editingId === tpl.id ? (
-                        <>
-                          <td>
-                            <input
-                              type="text"
-                              value={editData.activity_name}
-                              onChange={e => setEditData({ ...editData, activity_name: e.target.value })}
-                              style={{ width: '100%' }}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              value={editData.duration}
-                              onChange={e => setEditData({ ...editData, duration: e.target.value })}
-                              style={{ width: '80px' }}
-                            />
-                          </td>
-                          <td>
-                            <select
-                              value={editData.source_id}
-                              onChange={e => setEditData({ ...editData, source_id: e.target.value })}
-                            >
-                              <option value="">-</option>
-                              {sources.map(src => (
-                                <option key={src.id} value={src.id}>{src.name}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td>
-                            <div className="table-actions">
-                              <button className="btn btn-success btn-sm" onClick={() => handleSaveEdit(tpl.id)}>Simpan</button>
-                              <button className="btn btn-outline btn-sm" onClick={() => setEditingId(null)}>Batal</button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
+                      {(
                         <>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
