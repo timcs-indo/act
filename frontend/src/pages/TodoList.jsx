@@ -25,6 +25,9 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(false)
   
+  // State baru untuk filter halaman Todo List ('all', 'pending', 'completed')
+  const [filterType, setFilterType] = useState('all')
+  
   // Local state to track inline duration edits before saving
   const [editingDurations, setEditingDurations] = useState({}) // { activityId: value }
   const [savingId, setSavingId] = useState(null)
@@ -747,14 +750,54 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
         </div>
       </div>
 
+      {/* TABS INTERFACE UNTUK FILTER (ALL, PENDING, SELESAI) */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        marginBottom: '20px',
+        background: '#f8fafc',
+        padding: '6px',
+        borderRadius: '8px',
+        border: '1px solid var(--border)',
+        maxWidth: '450px'
+      }}>
+        <button 
+          className={`btn btn-sm ${filterType === 'all' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setFilterType('all')}
+          style={{ flex: 1, fontWeight: 700 }}
+        >
+          All ({activities.length})
+        </button>
+        <button 
+          className="btn btn-sm"
+          onClick={() => setFilterType('pending')}
+          style={{
+            flex: 1,
+            fontWeight: 700,
+            background: filterType === 'pending' ? 'var(--warning)' : 'transparent',
+            color: filterType === 'pending' ? 'var(--text)' : 'var(--text-light)',
+            borderColor: 'var(--warning)'
+          }}
+        >
+          ⏳ Pending ({pendingCount})
+        </button>
+        <button 
+          className={`btn btn-sm ${filterType === 'completed' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setFilterType('completed')}
+          style={{ flex: 1, fontWeight: 700 }}
+        >
+          ✓ Selesai ({completedCount})
+        </button>
+      </div>
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }} className="card">
           <p className="text-muted">Loading list aktivitas...</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* HANDOVER TASKS SECTION */}
-          {handoverTasks.length > 0 && (
+          {/* HANDOVER TASKS SECTION - Hanya tampil di filter 'all' */}
+          {filterType === 'all' && handoverTasks.length > 0 && (
             <div className="card" style={{ borderLeft: '4px solid #0D7A71' }}>
               <div className="flex-between mb-20">
                 <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -839,8 +882,8 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
             </div>
           )}
 
-          {/* OUTGOING HANDOVER TASKS SECTION */}
-          {outgoingHandovers.length > 0 && (
+          {/* OUTGOING HANDOVER TASKS SECTION - Hanya tampil di filter 'all' */}
+          {filterType === 'all' && outgoingHandovers.length > 0 && (
             <div className="card" style={{ borderLeft: '4px solid #3B82F6' }}>
               <div className="flex-between mb-20">
                 <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -942,288 +985,292 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
             </div>
           )}
 
-          {/* PENDING TASKS SECTION */}
-          <div className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
-            <div className="flex-between mb-20">
-              <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ⏳ Tugas Pending
-                <span style={{
-                  background: 'var(--warning)', color: 'var(--text)', 
-                  padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 700
-                }}>
-                  {pendingCount}
+          {/* PENDING TASKS SECTION - Tampil jika filter 'all' atau 'pending' */}
+          {(filterType === 'all' || filterType === 'pending') && (
+            <div className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
+              <div className="flex-between mb-20">
+                <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⏳ Tugas Pending
+                  <span style={{
+                    background: 'var(--warning)', color: 'var(--text)', 
+                    padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 700
+                  }}>
+                    {pendingCount}
+                  </span>
+                </h3>
+                <span style={{ fontSize: '13px', color: 'var(--text-light)' }}>
+                  Belum masuk perhitungan produktivitas dashboard
                 </span>
-              </h3>
-              <span style={{ fontSize: '13px', color: 'var(--text-light)' }}>
-                Belum masuk perhitungan produktivitas dashboard
-              </span>
-            </div>
-
-            {pendingCount === 0 ? (
-              <div style={{ padding: '30px', textAlign: 'center', background: '#F8FFFE', borderRadius: '8px' }}>
-                <p style={{ fontSize: '18px', color: '#17A697', fontWeight: 600 }}>🎉 Hore! Tidak ada tugas pending.</p>
-                <p className="text-muted" style={{ fontSize: '14px', marginTop: '4px' }}>
-                  Semua aktivitas untuk tanggal ini sudah selesai atau Anda belum membuat aktivitas di Kalender.
-                </p>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {activities.filter(act => !act.is_done).map(act => {
-                  const isDirty = editingDurations[act.id] !== undefined && parseInt(editingDurations[act.id]) !== act.duration
-                  return (
-                    <div 
-                      key={act.id} 
-                      className="task-card-pending"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '15px',
-                        background: '#FFFAF7', border: '2px solid #FFC107', borderRadius: '8px',
-                        padding: '14px 18px', boxShadow: '0 2px 4px rgba(255, 193, 7, 0.1)'
-                      }}
-                    >
-                      {/* Left: Info */}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{
-                            background: '#e0f7f5', color: '#0d7a71', 
-                            padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600
-                          }}>
-                            {act.category_name}
-                          </span>
-                          {act.start_time && (
-                            <span style={{ color: 'var(--text-light)', fontSize: '11px', fontWeight: 500 }}>
-                              🕒 {act.start_time} - {act.end_time || '--:--'}
+
+              {pendingCount === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', background: '#F8FFFE', borderRadius: '8px' }}>
+                  <p style={{ fontSize: '18px', color: '#17A697', fontWeight: 600 }}>🎉 Hore! Tidak ada tugas pending.</p>
+                  <p className="text-muted" style={{ fontSize: '14px', marginTop: '4px' }}>
+                    Semua aktivitas untuk tanggal ini sudah selesai atau Anda belum membuat aktivitas di Kalender.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {activities.filter(act => !act.is_done).map(act => {
+                    const isDirty = editingDurations[act.id] !== undefined && parseInt(editingDurations[act.id]) !== act.duration
+                    return (
+                      <div 
+                        key={act.id} 
+                        className="task-card-pending"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '15px',
+                          background: '#FFFAF7', border: '2px solid #FFC107', borderRadius: '8px',
+                          padding: '14px 18px', boxShadow: '0 2px 4px rgba(255, 193, 7, 0.1)'
+                        }}
+                      >
+                        {/* Left: Info */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{
+                              background: '#e0f7f5', color: '#0d7a71', 
+                              padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600
+                            }}>
+                              {act.category_name}
                             </span>
+                            {act.start_time && (
+                              <span style={{ color: 'var(--text-light)', fontSize: '11px', fontWeight: 500 }}>
+                                🕒 {act.start_time} - {act.end_time || '--:--'}
+                              </span>
+                            )}
+                            {act.source_name && (
+                              <span style={{ color: 'var(--text-light)', fontSize: '11px' }}>
+                                via {act.source_name}
+                              </span>
+                            )}
+                            {act.repeat_type && act.repeat_type !== 'none' && (
+                              <span 
+                                style={{ 
+                                  background: '#E3F2FD', color: '#1976D2', 
+                                  padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600
+                                }}
+                                title={`Pengulangan: ${act.repeat_type}${act.repeat_end_date ? ' sampai ' + act.repeat_end_date : ''}`}
+                              >
+                                🔁 {act.repeat_type}
+                              </span>
+                            )}
+                          </div>
+                          <h4 style={{ fontSize: '15px', fontWeight: 600, marginTop: '6px', color: 'var(--text)' }}>
+                            {act.activity_name}
+                          </h4>
+                          {act.notes && (
+                            <p style={{ fontSize: '12px', color: 'var(--text-light)', marginTop: '4px', fontStyle: 'italic' }}>
+                              {act.notes}
+                            </p>
                           )}
-                          {act.source_name && (
-                            <span style={{ color: 'var(--text-light)', fontSize: '11px' }}>
-                              via {act.source_name}
-                            </span>
-                          )}
-                          {act.repeat_type && act.repeat_type !== 'none' && (
-                            <span 
-                              style={{ 
-                                background: '#E3F2FD', color: '#1976D2', 
-                                padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600
+                        </div>
+
+                        {/* Middle: Duration Input (Editable) */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px 6px' }}>
+                            <input
+                              type="number"
+                              min="1"
+                              value={editingDurations[act.id] !== undefined ? editingDurations[act.id] : act.duration}
+                              onChange={(e) => handleDurationChange(act.id, e.target.value)}
+                              disabled={savingId === act.id}
+                              style={{
+                                width: '55px', border: 'none', textAlign: 'center', 
+                                fontSize: '14px', fontWeight: 600, outline: 'none'
                               }}
-                              title={`Pengulangan: ${act.repeat_type}${act.repeat_end_date ? ' sampai ' + act.repeat_end_date : ''}`}
+                            />
+                            <span style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 500, marginLeft: '2px' }}>menit</span>
+                          </div>
+                          
+                          {isDirty && (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => handleSaveDuration(act)}
+                              disabled={savingId === act.id}
+                              style={{ padding: '6px 10px', minWidth: 'auto' }}
+                              title="Simpan Durasi"
                             >
-                              🔁 {act.repeat_type}
-                            </span>
+                              💾
+                            </button>
                           )}
                         </div>
-                        <h4 style={{ fontSize: '15px', fontWeight: 600, marginTop: '6px', color: 'var(--text)' }}>
-                          {act.activity_name}
-                        </h4>
-                        {act.notes && (
-                          <p style={{ fontSize: '12px', color: 'var(--text-light)', marginTop: '4px', fontStyle: 'italic' }}>
-                            {act.notes}
-                          </p>
-                        )}
-                      </div>
 
-                      {/* Middle: Duration Input (Editable) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px 6px' }}>
-                          <input
-                            type="number"
-                            min="1"
-                            value={editingDurations[act.id] !== undefined ? editingDurations[act.id] : act.duration}
-                            onChange={(e) => handleDurationChange(act.id, e.target.value)}
-                            disabled={savingId === act.id}
-                            style={{
-                              width: '55px', border: 'none', textAlign: 'center', 
-                              fontSize: '14px', fontWeight: 600, outline: 'none'
-                            }}
-                          />
-                          <span style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 500, marginLeft: '2px' }}>menit</span>
-                        </div>
-                        
-                        {isDirty && (
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleSaveDuration(act)}
-                            disabled={savingId === act.id}
-                            style={{ padding: '6px 10px', minWidth: 'auto' }}
-                            title="Simpan Durasi"
-                          >
-                            💾
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Right: Action buttons */}
-                      <div className="task-action-buttons" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {/* Edit button */}
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => handleEditActivity(act)}
-                          disabled={savingId === act.id}
-                          title="Edit aktivitas"
-                          style={{ padding: '6px 10px', minWidth: 'auto', flex: '0 0 auto' }}
-                        >
-                          ✏️
-                        </button>
-
-                        {/* Delete button */}
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => handleDeleteActivity(act)}
-                          disabled={savingId === act.id}
-                          title="Hapus aktivitas"
-                          style={{ padding: '6px 10px', minWidth: 'auto', color: '#d32f2f', flex: '0 0 auto' }}
-                        >
-                          🗑️
-                        </button>
-
-                        {/* Handover button - only show if user can handover */}
-                        {handoverTargetRole(currentUser?.role) && (
+                        {/* Right: Action buttons */}
+                        <div className="task-action-buttons" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {/* Edit button */}
                           <button
                             className="btn btn-outline btn-sm"
-                            onClick={() => handleHandoverActivity(act)}
+                            onClick={() => handleEditActivity(act)}
                             disabled={savingId === act.id}
-                            title={`Serahkan ke ${ROLE_LABEL[handoverTargetRole(currentUser?.role)]}`}
-                            style={{ padding: '6px 10px', minWidth: 'auto', color: '#3B82F6', flex: '0 0 auto' }}
+                            title="Edit aktivitas"
+                            style={{ padding: '6px 10px', minWidth: 'auto', flex: '0 0 auto' }}
                           >
-                            → Handover
+                            ✏️
                           </button>
-                        )}
 
-                        {/* Done button */}
-                        <button
-                          className="btn btn-success btn-sm"
-                          onClick={() => handleToggleDone(act, true)}
-                          disabled={savingId === act.id}
-                          style={{ height: '36px', background: '#5DD65D', borderColor: '#5DD65D', padding: '6px 12px', flex: '0 0 auto' }}
-                        >
-                          ✓ Done
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* COMPLETED TASKS SECTION */}
-          <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
-            <div className="flex-between mb-20">
-              <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ✓ Tugas Selesai
-                <span style={{
-                  background: 'var(--primary)', color: 'white', 
-                  padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 700
-                }}>
-                  {completedCount}
-                </span>
-              </h3>
-              <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600 }}>
-                Sudah terhitung dalam produktivitas dashboard
-              </span>
-            </div>
-
-            {completedCount === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '8px' }}>
-                <p className="text-muted">Belum ada tugas selesai untuk hari ini.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {activities.filter(act => act.is_done).map(act => {
-                  const isDirty = editingDurations[act.id] !== undefined && parseInt(editingDurations[act.id]) !== act.duration
-                  return (
-                    <div 
-                      key={act.id} 
-                      className="task-card-completed"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '15px',
-                        background: '#F0FDF4', border: '2px solid #10B981', borderRadius: '8px',
-                        padding: '14px 18px', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.1)', opacity: 1
-                      }}
-                    >
-                      {/* Left: Info */}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{
-                            background: '#d1fae5', color: '#065f46', 
-                            padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600
-                          }}>
-                            {act.category_name}
-                          </span>
-                          {act.start_time && (
-                            <span style={{ color: 'var(--text-light)', fontSize: '11px' }}>
-                              🕒 {act.start_time} - {act.end_time || '--:--'}
-                            </span>
-                          )}
-                          <span style={{
-                            background: '#d1fae5', color: '#065f46', 
-                            padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 700
-                          }}>
-                            Selesai
-                          </span>
-                          {act.repeat_type && act.repeat_type !== 'none' && (
-                            <span 
-                              style={{ 
-                                background: '#E3F2FD', color: '#1976D2', 
-                                padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600
-                              }}
-                              title={`Pengulangan: ${act.repeat_type}${act.repeat_end_date ? ' sampai ' + act.repeat_end_date : ''}`}
-                            >
-                              🔁 {act.repeat_type}
-                            </span>
-                          )}
-                        </div>
-                        <h4 style={{ fontSize: '15px', fontWeight: 600, marginTop: '6px', color: 'var(--text)', textDecoration: 'line-through' }}>
-                          {act.activity_name}
-                        </h4>
-                      </div>
-
-                      {/* Middle: Duration Input (Editable) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px 6px' }}>
-                          <input
-                            type="number"
-                            min="1"
-                            value={editingDurations[act.id] !== undefined ? editingDurations[act.id] : act.duration}
-                            onChange={(e) => handleDurationChange(act.id, e.target.value)}
-                            disabled={savingId === act.id}
-                            style={{
-                              width: '55px', border: 'none', textAlign: 'center', 
-                              fontSize: '14px', fontWeight: 600, outline: 'none'
-                            }}
-                          />
-                          <span style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 500, marginLeft: '2px' }}>menit</span>
-                        </div>
-                        
-                        {isDirty && (
+                          {/* Delete button */}
                           <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleSaveDuration(act)}
+                            className="btn btn-outline btn-sm"
+                            onClick={() => handleDeleteActivity(act)}
                             disabled={savingId === act.id}
-                            style={{ padding: '6px 10px', minWidth: 'auto' }}
-                            title="Simpan Durasi"
+                            title="Hapus aktivitas"
+                            style={{ padding: '6px 10px', minWidth: 'auto', color: '#d32f2f', flex: '0 0 auto' }}
                           >
-                            💾
+                            🗑️
                           </button>
-                        )}
-                      </div>
 
-                      {/* Right: Undo/Cancel button */}
-                      <div className="task-action-buttons" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => handleToggleDone(act, false)}
-                          disabled={savingId === act.id}
-                          style={{ height: '36px', color: 'var(--text-light)', flex: '0 0 auto' }}
-                        >
-                          ↶ Batal
-                        </button>
+                          {/* Handover button - only show if user can handover */}
+                          {handoverTargetRole(currentUser?.role) && (
+                            <button
+                              className="btn btn-outline btn-sm"
+                              onClick={() => handleHandoverActivity(act)}
+                              disabled={savingId === act.id}
+                              title={`Serahkan ke ${ROLE_LABEL[handoverTargetRole(currentUser?.role)]}`}
+                              style={{ padding: '6px 10px', minWidth: 'auto', color: '#3B82F6', flex: '0 0 auto' }}
+                            >
+                              → Handover
+                            </button>
+                          )}
+
+                          {/* Done button */}
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => handleToggleDone(act, true)}
+                            disabled={savingId === act.id}
+                            style={{ height: '36px', background: '#5DD65D', borderColor: '#5DD65D', padding: '6px 12px', flex: '0 0 auto' }}
+                          >
+                            ✓ Done
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* COMPLETED TASKS SECTION - Tampil jika filter 'all' atau 'completed' */}
+          {(filterType === 'all' || filterType === 'completed') && (
+            <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
+              <div className="flex-between mb-20">
+                <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ✓ Tugas Selesai
+                  <span style={{
+                    background: 'var(--primary)', color: 'white', 
+                    padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 700
+                  }}>
+                    {completedCount}
+                  </span>
+                </h3>
+                <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600 }}>
+                  Sudah terhitung dalam produktivitas dashboard
+                </span>
               </div>
-            )}
-          </div>
+
+              {completedCount === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '8px' }}>
+                  <p className="text-muted">Belum ada tugas selesai untuk hari ini.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {activities.filter(act => act.is_done).map(act => {
+                    const isDirty = editingDurations[act.id] !== undefined && parseInt(editingDurations[act.id]) !== act.duration
+                    return (
+                      <div 
+                        key={act.id} 
+                        className="task-card-completed"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '15px',
+                          background: '#F0FDF4', border: '2px solid #10B981', borderRadius: '8px',
+                          padding: '14px 18px', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.1)', opacity: 1
+                        }}
+                      >
+                        {/* Left: Info */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{
+                              background: '#d1fae5', color: '#065f46', 
+                              padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600
+                            }}>
+                              {act.category_name}
+                            </span>
+                            {act.start_time && (
+                              <span style={{ color: 'var(--text-light)', fontSize: '11px' }}>
+                                🕒 {act.start_time} - {act.end_time || '--:--'}
+                              </span>
+                            )}
+                            <span style={{
+                              background: '#d1fae5', color: '#065f46', 
+                              padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 700
+                            }}>
+                              Selesai
+                            </span>
+                            {act.repeat_type && act.repeat_type !== 'none' && (
+                              <span 
+                                style={{ 
+                                  background: '#E3F2FD', color: '#1976D2', 
+                                  padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600
+                                }}
+                                title={`Pengulangan: ${act.repeat_type}${act.repeat_end_date ? ' sampai ' + act.repeat_end_date : ''}`}
+                              >
+                                🔁 {act.repeat_type}
+                              </span>
+                            )}
+                          </div>
+                          <h4 style={{ fontSize: '15px', fontWeight: 600, marginTop: '6px', color: 'var(--text)', textDecoration: 'line-through' }}>
+                            {act.activity_name}
+                          </h4>
+                        </div>
+
+                        {/* Middle: Duration Input (Editable) */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px 6px' }}>
+                            <input
+                              type="number"
+                              min="1"
+                              value={editingDurations[act.id] !== undefined ? editingDurations[act.id] : act.duration}
+                              onChange={(e) => handleDurationChange(act.id, e.target.value)}
+                              disabled={savingId === act.id}
+                              style={{
+                                width: '55px', border: 'none', textAlign: 'center', 
+                                fontSize: '14px', fontWeight: 600, outline: 'none'
+                              }}
+                            />
+                            <span style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 500, marginLeft: '2px' }}>menit</span>
+                          </div>
+                          
+                          {isDirty && (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => handleSaveDuration(act)}
+                              disabled={savingId === act.id}
+                              style={{ padding: '6px 10px', minWidth: 'auto' }}
+                              title="Simpan Durasi"
+                            >
+                              💾
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Right: Undo/Cancel button */}
+                        <div className="task-action-buttons" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => handleToggleDone(act, false)}
+                            disabled={savingId === act.id}
+                            style={{ height: '36px', color: 'var(--text-light)', flex: '0 0 auto' }}
+                          >
+                            ↶ Batal
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
