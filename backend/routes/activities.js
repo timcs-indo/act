@@ -183,7 +183,7 @@ router.get('/', (req, res) => {
 router.get('/calendar', (req, res) => {
   try {
     const { date } = req.query;
-    const activityDate = date || new Date().toISOString().split('T')[0];
+    const activityDate = date || new Date().toLocaleDateString('sv-SE');
 
     const allowed = allowedTeamIds(req.user);
     let teamFilter = '';
@@ -333,48 +333,63 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { category_id, activity_name, duration, start_time, end_time, source_id, notes, sync_google_calendar, is_done } = req.body;
+    const { category_id, activity_name, duration, start_time, end_time, source_id, notes, sync_google_calendar, is_done, repeat_type, repeat_end_date, activity_date } = req.body;
 
     console.log(`\n🔧 [${new Date().toLocaleTimeString()}] PUT /activities/${id}`, {
       is_done_received: is_done,
       is_done_type: typeof is_done,
       is_done_undefined: is_done === undefined,
-      category_id, activity_name, duration
+      category_id, activity_name, duration,
+      repeat_type, repeat_end_date, activity_date
     });
 
-    const is_done_param = is_done !== undefined ? is_done : null;
-    console.log(`📋 SQL param: is_done = ${is_done_param}`);
+    // Fetch existing activity to check recurrence info
+    const existing = db.prepare('SELECT activity_date, repeat_type, repeat_end_date FROM daily_activities WHERE id = ?').get(id);
+    const isRecurring = existing && existing.repeat_type && existing.repeat_type !== 'none';
 
-    const result = db.prepare(`
-      UPDATE daily_activities
-      SET category_id = ?, activity_name = ?, duration = ?, start_time = ?, end_time = ?, source_id = ?, notes = ?, is_done = COALESCE(?, is_done), updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      category_id,
-      activity_name || '',
-      duration,
-      start_time || null,
-      end_time || null,
-      source_id || null,
-      notes || null,
-      is_done_param,
-      id
-    );
+    // Determine if we need to update future occurrences
+    if (isRecurring && activity_date) {
+      // Update all future occurrences (including this one) where date >= provided activity_date
+      const result = db.prepare(`
+        UPDATE daily_activities
+        SET category_id = ?, activity_name = ?, duration = ?, start_time = ?, end_time = ?, source_id = ?, notes = ?, is_done = COALESCE(?, is_done), updated_at = CURRENT_TIMESTAMP
+        WHERE repeat_type = ?
+          AND activity_date >= ?
+          AND is_done = 0
+      `).run(
+        category_id,
+        activity_name || '',
+        duration,
+        start_time || null,
+        end_time || null,
+        source_id || null,
+        notes || null,
+        is_done,
+        existing.repeat_type,
+        activity_date
+      );
 
-    console.log(`✅ UPDATE result:`, {
-      changes: result.changes,
-      rows_affected: result.changes > 0 ? 'YES' : 'NO ROWS AFFECTED!'
-    });
-
-    // Verify the update was successful
-    if (result.changes === 0) {
-      console.warn(`⚠️ WARNING: No rows updated! Activity ${id} might not exist.`);
-      return res.status(404).json({ error: `Activity ${id} not found` });
+      console.log(`✅ Updated ${result.changes} future recurring activities`);
+    } else {
+      // Single update as before
+      const result = db.prepare(`
+        UPDATE daily_activities
+        SET category_id = ?, activity_name = ?, duration = ?, start_time = ?, end_time = ?, source_id = ?, notes = ?, is_done = COALESCE(?, is_done), updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        category_id,
+        activity_name || '',
+        duration,
+        start_time || null,
+        end_time || null,
+        source_id || null,
+        notes || null,
+        is_done,
+        id
+      );
     }
 
-    // Read back to verify the change
-    const updated = db.prepare('SELECT id, activity_name, is_done FROM daily_activities WHERE id = ?').get(id);
-    console.log(`📖 After UPDATE - Activity ${id}:`, updated);
+    console.log(`✅ UPDATE result:`);
 
     // Google Calendar sync only if requested
     if (sync_google_calendar) {

@@ -171,7 +171,7 @@ router.post('/handover', (req, res) => {
       notes || null,
       targetUser.id,
       assigned_from_user_id,
-      assigned_date || new Date().toISOString().split('T')[0]
+      assigned_date || new Date().toLocaleDateString('sv-SE')
     );
 
     res.json({
@@ -220,7 +220,7 @@ router.post('/:taskId/process', async (req, res) => {
     `).run(
       team_leader_id || task.team_leader_id,
       on_duty_user_id || task.assigned_to_user_id,
-      activity_date || new Date().toISOString().split('T')[0],
+      activity_date || new Date().toLocaleDateString('sv-SE'),
       category_id || task.category_id,
       activity_name || task.task_name,
       finalDuration,
@@ -275,7 +275,7 @@ router.post('/process-all/:teamLeaderId', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const markDone = db.prepare('UPDATE handover_tasks SET is_processed = 1, activity_id = ? WHERE id = ?');
-    const date = activity_date || new Date().toISOString().split('T')[0];
+    const date = activity_date || new Date().toLocaleDateString('sv-SE');
 
     const processAll = db.transaction((tasks) => {
       let n = 0;

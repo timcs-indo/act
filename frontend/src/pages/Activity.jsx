@@ -46,7 +46,7 @@ const EMPTY_FORM = {
 }
 
 export default function Activity({ teamLeaders, users = [], categories = [], sources = [], currentUser }) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('sv-SE')
   const [selectedDate, setSelectedDate] = useState(today)
   const [selectedTeamLeader, setSelectedTeamLeader] = useState(null)
 
@@ -126,8 +126,10 @@ export default function Activity({ teamLeaders, users = [], categories = [], sou
   }
 
   const shiftDay = (delta) => {
-    const d = new Date(selectedDate); d.setDate(d.getDate() + delta)
-    setSelectedDate(d.toISOString().split('T')[0])
+    const [y, m, d] = selectedDate.split('-').map(Number)
+    const date = new Date(y, m - 1, d)
+    date.setDate(date.getDate() + delta)
+    setSelectedDate(date.toLocaleDateString('sv-SE'))
   }
 
   // Define constants first (needed by timeline effect)

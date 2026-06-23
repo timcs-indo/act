@@ -16,7 +16,7 @@ const handoverTargetRole = (role) => {
 }
 
 export default function TodoList({ teamLeaders, users = [], currentUser, categories = [], sources = [] }) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('sv-SE')
   const [selectedDate, setSelectedDate] = useState(today)
   const [activities, setActivities] = useState([])
   const [handoverTasks, setHandoverTasks] = useState([])
@@ -27,6 +27,15 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
   
   // State baru untuk filter halaman Todo List ('all', 'pending', 'completed')
   const [filterType, setFilterType] = useState('all')
+  
+  // ── Sorting helper ──
+  const sortByStartTime = (list) => {
+    return [...list].sort((a, b) => {
+      const aTime = a.start_time || '23:59'
+      const bTime = b.start_time || '23:59'
+      return aTime.localeCompare(bTime)
+    })
+  }
   
   // Local state to track inline duration edits before saving
   const [editingDurations, setEditingDurations] = useState({}) // { activityId: value }
@@ -40,7 +49,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
   const [createForm, setCreateForm] = useState({
     activity_name: '',
     category_id: '',
-    activity_date: new Date().toISOString().split('T')[0],
+    activity_date: new Date().toLocaleDateString('sv-SE'),
     duration: '30',
     start_time: '09:00',
     end_time: '09:30',
@@ -81,12 +90,12 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
     // Default end date: 3 months from today
     const defaultEndDate = new Date()
     defaultEndDate.setMonth(defaultEndDate.getMonth() + 3)
-    const endDateStr = defaultEndDate.toISOString().split('T')[0]
+    const endDateStr = defaultEndDate.toLocaleDateString('sv-SE')
     
     setCreateForm({
       activity_name: '',
       category_id: '',
-      activity_date: selectedDate || new Date().toISOString().split('T')[0],
+      activity_date: selectedDate || new Date().toLocaleDateString('sv-SE'),
       duration: '30',
       start_time: currentTime,
       end_time: endTime,
@@ -232,9 +241,10 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
   }
 
   const shiftDay = (delta) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + delta)
-    setSelectedDate(d.toISOString().split('T')[0])
+    const [y, m, d] = selectedDate.split('-').map(Number)
+    const date = new Date(y, m - 1, d)
+    date.setDate(date.getDate() + delta)
+    setSelectedDate(date.toLocaleDateString('sv-SE'))
   }
 
   const handleDurationChange = (id, val) => {
@@ -353,7 +363,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
     setCreateForm({
       activity_name: act.activity_name,
       category_id: act.category_id.toString(),
-      activity_date: act.activity_date || new Date().toISOString().split('T')[0],
+      activity_date: act.activity_date || new Date().toLocaleDateString('sv-SE'),
       duration: act.duration.toString(),
       start_time: act.start_time || getCurrentTime(),
       end_time: act.end_time || '',
@@ -491,7 +501,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
     setCreateForm({
       activity_name: handoverTask.task_name,
       category_id: handoverTask.category_id?.toString() || '',
-      activity_date: selectedDate || new Date().toISOString().split('T')[0],
+      activity_date: selectedDate || new Date().toLocaleDateString('sv-SE'),
       duration: (handoverTask.duration || 30).toString(),
       start_time: currentTime,
       end_time: endTime,
@@ -657,12 +667,12 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
       const endTime = calculateEndTime(currentTime, 30)
       const defaultEndDate = new Date()
       defaultEndDate.setMonth(defaultEndDate.getMonth() + 3)
-      const endDateStr = defaultEndDate.toISOString().split('T')[0]
+      const endDateStr = defaultEndDate.toLocaleDateString('sv-SE')
       
       setCreateForm({
         activity_name: '',
         category_id: '',
-        activity_date: new Date().toISOString().split('T')[0],
+        activity_date: new Date().toLocaleDateString('sv-SE'),
         duration: '30',
         start_time: currentTime,
         end_time: endTime,
@@ -1012,7 +1022,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {activities.filter(act => !act.is_done).map(act => {
+                  {sortByStartTime(activities.filter(act => !act.is_done)).map(act => {
                     const isDirty = editingDurations[act.id] !== undefined && parseInt(editingDurations[act.id]) !== act.duration
                     return (
                       <div 
@@ -1174,7 +1184,7 @@ export default function TodoList({ teamLeaders, users = [], currentUser, categor
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {activities.filter(act => act.is_done).map(act => {
+                  {sortByStartTime(activities.filter(act => act.is_done)).map(act => {
                     const isDirty = editingDurations[act.id] !== undefined && parseInt(editingDurations[act.id]) !== act.duration
                     return (
                       <div 

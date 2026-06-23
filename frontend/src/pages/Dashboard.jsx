@@ -12,8 +12,8 @@ const COLORS = ['#17A697', '#5DD65D', '#FFC107', '#FF6B35', '#0D7A71', '#00A8E8'
 const fmt = (n) => n ? n.toLocaleString('id-ID') : '0'
 
 export default function Dashboard({ teamLeaders, users = [], currentUser }) {
-  const today = new Date().toISOString().split('T')[0]
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('sv-SE')
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toLocaleDateString('sv-SE')
 
   const [filterArea, setFilterArea] = useState('')
   const [filterTL, setFilterTL] = useState('')
@@ -27,16 +27,16 @@ export default function Dashboard({ teamLeaders, users = [], currentUser }) {
   const getDateRange = (p) => {
     const now = new Date()
     if (p === 'daily') {
-      const d = now.toISOString().split('T')[0]
+      const d = now.toLocaleDateString('sv-SE')
       return { s: d, e: d }
     }
     if (p === 'weekly') {
       const day = now.getDay()
       const mon = new Date(now); mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
-      return { s: mon.toISOString().split('T')[0], e: today }
+      return { s: mon.toLocaleDateString('sv-SE'), e: today }
     }
     if (p === 'monthly') {
-      const s = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const s = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('sv-SE')
       return { s, e: today }
     }
     return { s: startDate, e: endDate }

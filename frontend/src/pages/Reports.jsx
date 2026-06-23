@@ -5,8 +5,8 @@ import toast from '../utils/toast'
 export default function Reports({ teamLeaders }) {
   const [selectedTeamLeader, setSelectedTeamLeader] = useState(null)
   const [period, setPeriod] = useState('monthly')
-  const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE'))
+  const [endDate, setEndDate] = useState(new Date().toLocaleDateString('sv-SE'))
   const [summary, setSummary] = useState([])
   const [detailedReport, setDetailedReport] = useState([])
   const [loading, setLoading] = useState(false)

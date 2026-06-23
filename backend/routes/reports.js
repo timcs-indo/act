@@ -10,8 +10,8 @@ const router = express.Router();
 router.get('/dashboard', (req, res) => {
   try {
     let { teamLeaderId, startDate, endDate } = req.query;
-    const start = startDate || new Date().toISOString().split('T')[0];
-    const end = endDate || new Date().toISOString().split('T')[0];
+    const start = startDate || new Date().toLocaleDateString('sv-SE');
+    const end = endDate || new Date().toLocaleDateString('sv-SE');
 
     // Role scoping: non-supervisor dibatasi ke tim sendiri
     const allowed = allowedTeamIds(req.user);
@@ -169,7 +169,7 @@ router.get('/summary', (req, res) => {
         ${teamLeaderId ? 'AND (u.id = ? OR u.team_leader_id = ?)' : ''}
       GROUP BY u.id
       ORDER BY u.role DESC, u.name
-    `).all(start.toISOString().split('T')[0], end.toISOString().split('T')[0], ...(teamLeaderId ? [teamLeaderId, teamLeaderId] : []));
+    `).all(start.toLocaleDateString('sv-SE'), end.toLocaleDateString('sv-SE'), ...(teamLeaderId ? [teamLeaderId, teamLeaderId] : []));
 
     res.json(summary);
   } catch (error) {

@@ -432,7 +432,7 @@ const handlers = {
   },
 
   async getCalendarActivities(params = {}) {
-    const date = params.date || new Date().toISOString().split('T')[0]
+    const date = params.date || new Date().toLocaleDateString('sv-SE')
     let query = supabase
       .from('daily_activities')
       .select(`
